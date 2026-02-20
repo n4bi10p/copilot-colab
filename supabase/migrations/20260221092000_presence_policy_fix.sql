@@ -1,0 +1,2 @@
+-- Legacy migration kept for ordering compatibility.
+-- Presence policies are now managed in 20260221091000_rls.sql.

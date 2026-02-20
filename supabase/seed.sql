@@ -1,0 +1,2 @@
+-- Minimal seed data for local development.
+-- Keep empty by default because auth.users rows are managed by Supabase Auth.
