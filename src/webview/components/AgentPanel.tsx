@@ -75,7 +75,7 @@ const AgentPanel: React.FC = () => {
       try {
         // Compose prompt for Gemini (strip @gemini for clarity)
         const prompt = text.replace(/@gemini/gi, "").trim() || "How can I help?";
-        const response = await backendClient.suggestFromSelection<{ content: string }>({ prompt, model: "gpt-4.1" });
+        const response = await backendClient.suggestFromSelection<{ content: string }>({ prompt });
         addAgentMessage({
           id: `agent-gemini-${Date.now()}`,
           role: "agent",

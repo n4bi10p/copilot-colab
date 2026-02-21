@@ -85,43 +85,34 @@ const ChatPanel: React.FC = () => {
   const handleSend = async () => {
     if (!inputValue.trim() || !project?.id || !currentUser?.uid) return;
     setSending(true);
-    const msg: Message = {
-      id: `msg-${Date.now()}`,
+    const text = inputValue.trim();
+
+    // Optimistic message
+    const optimisticMsg: Message = {
+      id: `pending-${Date.now()}`,
       project_id: project.id,
-      text: inputValue.trim(),
+      text,
       author_id: currentUser.uid,
       created_at: new Date().toISOString(),
+      _status: "sending",
     };
-    addMessage(msg);
+    addMessage(optimisticMsg);
     setInputValue("");
+
     try {
-      await backendClient.execute("copilotColab.messages.send", msg);
-    } catch {
-      // Optionally show error or retry
-    }
-    // If user mentions @gemini, call backend Gemini integration and persist reply
-    if (/@gemini/i.test(msg.text)) {
-      try {
-        // Call Gemini via backend (AI WBS as a placeholder, can be replaced with a chat endpoint)
-        const aiRes = await backendClient.execute<any>("copilotColab.ai.generateWbs", {
-          projectId: project.id,
-          goal: msg.text,
-          maxTasks: 1,
-          persist: false,
-        });
-        const geminiText = aiRes?.notes?.[0] || aiRes?.generated?.[0]?.title || "Gemini is thinking...";
-        const geminiMsg: Message = {
-          id: `gemini-${Date.now()}`,
-          project_id: project.id,
-          text: geminiText,
-          author_id: "gemini",
-          created_at: new Date().toISOString(),
-        };
-        addMessage(geminiMsg);
-        await backendClient.execute("copilotColab.messages.send", geminiMsg);
-      } catch {
-        // Optionally show error or fallback
+      // sendMessageAndList sends the message AND returns updated list
+      // Backend auto-replies when @gemini is mentioned
+      const freshList = await backendClient.sendMessageAndList<Message[]>(project.id, text, currentUser.uid);
+      if (Array.isArray(freshList)) {
+        setMessages(freshList);
       }
+    } catch {
+      // Mark optimistic message as failed
+      addMessage({
+        ...optimisticMsg,
+        id: `failed-${Date.now()}`,
+        _status: "failed",
+      });
     }
     setSending(false);
   };

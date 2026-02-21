@@ -214,22 +214,21 @@ const App: React.FC = () => {
     <>
       <ToastContainer />
       <RealtimeListeners />
-      {(activePanel === "dashboard" || activePanel === "chat") ? (
+      {activePanel === "dashboard" ? (
         <div className="dashboard-grid bg-background-dark selection:bg-primary/30 selection:text-white">
           <NavRail />
           <StatColumn />
-          {activePanel === "dashboard" && <TaskBoard />}
-          {activePanel === "dashboard" && <AgentPanel />}
-          {(activePanel as string) === "chat" && <ChatPanel />}
+          <TaskBoard />
+          <AgentPanel />
         </div>
       ) : (
         <div className="flex h-screen overflow-hidden bg-background-dark selection:bg-primary/30 selection:text-white">
           <NavRail />
-          {(activePanel as string) === "tasks" && <TasksView />}
-          {(activePanel as string) === "chat" && <ChatPanel />}
-          {(activePanel as string) === "agent" && <AgentView />}
-          {(activePanel as string) === "terminal" && <TerminalView />}
-          {(activePanel as string) === "settings" && <SettingsPanel />}
+          {activePanel === "tasks" && <TasksView />}
+          {activePanel === "chat" && <ChatPanel />}
+          {activePanel === "agent" && <AgentView />}
+          {activePanel === "terminal" && <TerminalView />}
+          {activePanel === "settings" && <SettingsPanel />}
         </div>
       )}
     </>
