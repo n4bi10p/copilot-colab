@@ -60,7 +60,19 @@ export class BackendClient {
       this.pending.delete(message.requestId);
 
       if (message.ok) {
-        entry.resolve(message.data);
+        // Extension commands wrap results with ok(data) → { ok: true, data: X }.
+        // Unwrap that envelope so callers receive X directly.
+        const payload = message.data as any;
+        if (
+          payload !== null &&
+          typeof payload === "object" &&
+          payload.ok === true &&
+          Object.prototype.hasOwnProperty.call(payload, "data")
+        ) {
+          entry.resolve(payload.data);
+        } else {
+          entry.resolve(payload);
+        }
       } else {
         entry.reject(new Error(message.error ?? "Unknown backend error"));
       }
