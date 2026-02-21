@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { CopilotColabAiApi } from "./api/ai";
 import { CopilotColabAuthApi } from "./api/auth";
+import { CopilotSdkApi } from "./api/copilot";
 import { CopilotColabGithubApi } from "./api/github";
 import { CopilotColabRealtimeApi } from "./api/realtime";
 import { CopilotColabSupabaseApi } from "./api/supabase";
@@ -22,6 +23,7 @@ export const COMMANDS = {
   authSignUpPassword: "copilotColab.auth.signUpWithPassword",
   authSignOut: "copilotColab.auth.signOut",
   aiGenerateWbs: "copilotColab.ai.generateWbs",
+  aiSuggestFromSelection: "copilotColab.ai.suggestFromSelection",
   aiSmokeTest: "copilotColab.ai.smokeTest",
   createProject: "copilotColab.project.create",
   inviteMember: "copilotColab.member.invite",
@@ -36,6 +38,7 @@ export const COMMANDS = {
 
 interface CommandDeps {
   aiApi: CopilotColabAiApi;
+  copilotApi: CopilotSdkApi;
   authApi: CopilotColabAuthApi;
   githubApi: CopilotColabGithubApi;
   api: CopilotColabSupabaseApi;
@@ -86,6 +89,12 @@ interface GenerateWbsArgs {
   persist?: boolean;
 }
 
+interface SuggestFromSelectionArgs {
+  prompt?: string;
+  model?: string;
+  cliUrl?: string;
+}
+
 type CommandSuccess = { ok: true; data: unknown };
 type CommandFailure = { ok: false; error: string };
 type CommandResult = CommandSuccess | CommandFailure;
@@ -99,7 +108,7 @@ function fail(error: unknown): CommandFailure {
 }
 
 export function registerBackendCommands(context: vscode.ExtensionContext, deps: CommandDeps): void {
-  const { aiApi, authApi, githubApi, api, realtimeApi, output } = deps;
+  const { aiApi, copilotApi, authApi, githubApi, api, realtimeApi, output } = deps;
   const subscriptions = new Map<string, RealtimeChannel[]>();
 
   const register = (command: string, handler: (...args: any[]) => Promise<CommandResult>) => {
@@ -192,6 +201,46 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
       notes: suggestion.notes,
       persistedCount,
     });
+  });
+
+  register(COMMANDS.aiSuggestFromSelection, async (args: SuggestFromSelectionArgs = {}) => {
+    const editor = vscode.window.activeTextEditor;
+    const selectionText = editor
+      ? editor.document.getText(editor.selection.isEmpty ? undefined : editor.selection).trim()
+      : "";
+
+    if (!selectionText) {
+      throw new Error("No active selection found. Select code/text in the editor and retry.");
+    }
+
+    const language = editor?.document.languageId ?? "plaintext";
+    const filePath = editor?.document.uri.fsPath ?? "untitled";
+    const userPrompt = args.prompt?.trim() || "Explain this code and suggest concrete improvements.";
+    const composedPrompt = [
+      `You are reviewing code from file: ${filePath}`,
+      `Language: ${language}`,
+      "",
+      "Task:",
+      userPrompt,
+      "",
+      "Selected code:",
+      "```",
+      selectionText,
+      "```",
+      "",
+      "Return practical, concise guidance with suggested edits.",
+    ].join("\n");
+
+    const data = await copilotApi.suggestFromSelection({
+      prompt: composedPrompt,
+      model: args.model ?? "",
+      cliUrl: args.cliUrl,
+    });
+
+    output.appendLine(
+      `[${COMMANDS.aiSuggestFromSelection}] file=${filePath} language=${language} model=${data.model}`
+    );
+    return ok(data);
   });
 
   register(COMMANDS.aiSmokeTest, async () => {

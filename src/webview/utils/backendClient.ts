@@ -25,6 +25,7 @@ export const BACKEND_COMMANDS = {
   authSignUpPassword: "copilotColab.auth.signUpWithPassword",
   authSignOut: "copilotColab.auth.signOut",
   aiGenerateWbs: "copilotColab.ai.generateWbs",
+  aiSuggestFromSelection: "copilotColab.ai.suggestFromSelection",
   createProject: "copilotColab.project.create",
   inviteMember: "copilotColab.member.invite",
   removeMember: "copilotColab.member.remove",
@@ -122,6 +123,14 @@ export class BackendClient {
     persist?: boolean;
   }): Promise<T> {
     return this.execute<T>(BACKEND_COMMANDS.aiGenerateWbs, args, 20_000);
+  }
+
+  suggestFromSelection<T = unknown>(args?: {
+    prompt?: string;
+    model?: string;
+    cliUrl?: string;
+  }): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.aiSuggestFromSelection, args, 20_000);
   }
 
   private makeRequestId(): string {

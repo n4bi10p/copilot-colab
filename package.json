@@ -18,6 +18,7 @@
     "onCommand:copilotColab.auth.signUpWithPassword",
     "onCommand:copilotColab.auth.signOut",
     "onCommand:copilotColab.ai.generateWbs",
+    "onCommand:copilotColab.ai.suggestFromSelection",
     "onCommand:copilotColab.ai.smokeTest",
     "onCommand:copilotColab.project.create",
     "onCommand:copilotColab.member.invite",
@@ -58,6 +59,10 @@
       {
         "command": "copilotColab.ai.generateWbs",
         "title": "Copilot CoLab: AI Generate WBS"
+      },
+      {
+        "command": "copilotColab.ai.suggestFromSelection",
+        "title": "Copilot CoLab: AI Suggest From Selection"
       },
       {
         "command": "copilotColab.ai.smokeTest",
@@ -127,6 +132,7 @@
     "build": "webpack --config webpack.config.js --mode production"
   },
   "dependencies": {
+    "@github/copilot-sdk": "^0.1.25",
     "@supabase/supabase-js": "^2.57.4",
     "process": "^0.11.10",
     "react": "^19.2.0",
