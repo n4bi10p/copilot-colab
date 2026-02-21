@@ -5,7 +5,7 @@ import type { Task, TaskStatus } from "../../types";
 
 const POLL_INTERVAL_MS = 5_000;
 
-// Subscribe to tasks for the current project — polls every 5 s
+// Subscribe to tasks for the current project ï¿½ polls every 5 s
 export function useTasksListener(): void {
   const setTasks = useStore((s) => s.setTasks);
   const project = useStore((s) => s.project);
@@ -19,7 +19,7 @@ export function useTasksListener(): void {
     const fetchTasks = () => {
       backendClient
         .execute<Task[]>(BACKEND_COMMANDS.listTasks, { projectId })
-        .then((tasks) => setTasks(tasks ?? []))
+        .then((raw) => setTasks(Array.isArray(raw) ? raw : []))
         .catch(() => { /* offline/preview mode */ });
     };
 

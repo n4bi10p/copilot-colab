@@ -5,7 +5,7 @@ import type { Message } from "../../types";
 
 const POLL_INTERVAL_MS = 5_000;
 
-// Subscribe to messages for the current project — polls every 5 s
+// Subscribe to messages for the current project ï¿½ polls every 5 s
 export function useMessagesListener(): void {
   const setMessages = useStore((s) => s.setMessages);
   const project = useStore((s) => s.project);
@@ -19,7 +19,7 @@ export function useMessagesListener(): void {
     const fetchMessages = () => {
       backendClient
         .execute<Message[]>(BACKEND_COMMANDS.listMessages, { projectId })
-        .then((msgs) => setMessages(msgs ?? []))
+        .then((raw) => setMessages(Array.isArray(raw) ? raw : []))
         .catch(() => { /* offline/preview mode */ });
     };
 

@@ -148,7 +148,7 @@ export const useStore = create<AppState>((set) => ({
       updated_at: new Date().toISOString(),
     },
   ],
-  setTasks: (tasks) => set({ tasks }),
+  setTasks: (tasks) => set({ tasks: Array.isArray(tasks) ? tasks : [] }),
   addTask: (task) => set((s) => ({ tasks: [...s.tasks, task] })),
   updateTask: (id, updates) =>
     set((s) => ({
@@ -163,7 +163,7 @@ export const useStore = create<AppState>((set) => ({
 
   // Chat
   messages: [],
-  setMessages: (messages) => set({ messages }),
+  setMessages: (messages) => set({ messages: Array.isArray(messages) ? messages : [] }),
   addMessage: (message) =>
     set((s) => ({ messages: [...s.messages, message] })),
 

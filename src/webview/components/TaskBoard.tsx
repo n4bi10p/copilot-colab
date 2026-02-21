@@ -210,9 +210,10 @@ const KanbanColumn: React.FC<{ status: TaskStatus; label: string; tasks: Task[] 
 // ── Task Board ───────────────────────────────────────────────────────────────
 const TaskBoard: React.FC = () => {
   const tasks = useStore((s) => s.tasks);
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
 
   const getTasksByStatus = (status: TaskStatus) =>
-    tasks.filter((t) => t.status === status);
+    safeTasks.filter((t) => t.status === status);
 
   return (
     <main className="flex flex-col bg-[#141416] overflow-hidden relative">
