@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useStore } from "../../state/store";
 import { backendClient } from "../utils/backendClient";
 import type { AgentMessage } from "../../types";
+import { backendClient } from "../utils/backendClient";
 
 const SLASH_COMMANDS = [
   { cmd: "/wbs", desc: "Generate Work Breakdown Structure from project description" },
@@ -110,6 +111,7 @@ const AgentView: React.FC = () => {
     setIsTyping(true);
 
     try {
+<<<<<<< Updated upstream
       let content = "";
       let actions: string[] | undefined;
 
@@ -165,11 +167,71 @@ const AgentView: React.FC = () => {
         id: `agent-err-${Date.now()}`,
         role: "agent",
         content: `Error: ${err?.message ?? "AI request failed"}`,
+=======
+      const response = await getAgentResponse(text);
+      addAgentMessage({
+        id: `agent-${Date.now()}`,
+        role: "agent",
+        content: response.content,
+        timestamp: Date.now(),
+        actions: response.actions,
+      });
+    } catch (error) {
+      addAgentMessage({
+        id: `agent-${Date.now()}`,
+        role: "agent",
+        content: `Error: ${error instanceof Error ? error.message : String(error)}`,
+>>>>>>> Stashed changes
         timestamp: Date.now(),
       });
     } finally {
       setIsTyping(false);
+<<<<<<< Updated upstream
     }
+=======
+    }
+  };
+
+  const getAgentResponse = async (text: string): Promise<{ content: string; actions?: string[] }> => {
+    const lower = text.toLowerCase();
+    const project = useStore.getState().project;
+
+    if (lower.includes("/wbs")) {
+      if (!project?.id) {
+        return { content: "I need an active project context to generate a WBS. Please ensure you are logged in and a project is selected." };
+      }
+
+      // Extract goal from text (remove /wbs)
+      const goal = text.replace(/\/wbs/i, "").trim() || "General project breakdown";
+
+      const result = await backendClient.generateWbs<{
+        generated: Array<{ title: string; status: string }>;
+        notes: string[];
+        persistedCount: number;
+      }>({
+        projectId: project.id,
+        goal,
+        persist: true,
+      });
+
+      const taskList = result.generated.map((t) => `- \`${t.status}\` ${t.title}`).join("\n");
+      const notes = result.notes.length > 0 ? `\n\n**Notes:**\n${result.notes.join("\n")}` : "";
+
+      return {
+        content: `**WBS Generated:**\n\n${taskList}${notes}\n\n${result.persistedCount} tasks were created in the board.`,
+        actions: ["View Board"],
+      };
+    }
+    if (lower.includes("/digest")) {
+      return {
+        content: "**Daily Digest — Feb 21, 2026**\n\nTasks completed: 2 | In progress: 2 | Blocked: 1\n\nKey updates:\n- `NET-conflict` has a merge conflict with `origin/main` in `payment-api.ts`\n- `NET-review-1` is ready to merge (2/2 approvals)\n- Build time improved by 12% vs yesterday\n\nTeam is on track for Cycle 42 deadline.",
+        actions: ["Send to Team", "Copy", "Dismiss"],
+      };
+    }
+    return {
+      content: "I've analyzed your request. Based on the current project state, I recommend prioritizing the `in-progress` tasks before picking up new backlog items. The payment API conflict should be resolved first as it blocks 2 downstream tasks.",
+    };
+>>>>>>> Stashed changes
   };
 
   const filteredCommands = SLASH_COMMANDS.filter((c) =>

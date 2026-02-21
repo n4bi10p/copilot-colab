@@ -38,6 +38,7 @@
     "onCommand:copilotColab.tasks.list",
     "onCommand:copilotColab.tasks.create",
     "onCommand:copilotColab.tasks.updateStatus",
+    "onCommand:copilotColab.tasks.updateAssignee",
     "onCommand:copilotColab.messages.list",
     "onCommand:copilotColab.messages.subscribeState",
     "onCommand:copilotColab.messages.send",
@@ -152,6 +153,10 @@
       {
         "command": "copilotColab.tasks.updateStatus",
         "title": "Copilot CoLab: Update Task Status"
+      },
+      {
+        "command": "copilotColab.tasks.updateAssignee",
+        "title": "Copilot CoLab: Update Task Assignee"
       },
       {
         "command": "copilotColab.messages.list",

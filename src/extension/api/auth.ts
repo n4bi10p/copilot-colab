@@ -36,7 +36,27 @@ export class CopilotColabAuthApi {
       }
       throw new Error(error.message);
     }
+    if (data.user) {
+      await this.ensureProfile(data.user);
+    }
     return data.user;
+  }
+
+  private async ensureProfile(user: User): Promise<void> {
+    const { error } = await this.client.from("profiles").upsert(
+      {
+        id: user.id,
+        email: user.email,
+        username: user.user_metadata?.user_name,
+        full_name: user.user_metadata?.full_name,
+        avatar_url: user.user_metadata?.avatar_url,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
+    if (error) {
+      console.warn("Failed to ensure profile:", error);
+    }
   }
 
   async signInWithPassword(input: PasswordAuthInput): Promise<AuthSession | null> {

@@ -116,10 +116,6 @@ interface UpdateTaskAssigneeArgs {
   assigneeId: string | null;
 }
 
-interface AssignTasksArgs {
-  projectId: string;
-}
-
 interface SendMessageArgs {
   projectId: string;
   text: string;
@@ -201,6 +197,10 @@ function fail(error: unknown): CommandFailure {
 
 function hasGeminiMention(text: string): boolean {
   return /(^|\s)@gemini\b/i.test(text);
+}
+
+function hasAssignIntent(text: string): boolean {
+  return /\b(assign|allocate|distribute|create)\b/i.test(text);
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -368,11 +368,21 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
     ).slice(0, 50);
 
     const members = await api.listProjectMembers(args.projectId);
+
+    let githubContributors: string[] = [];
+    try {
+      const summary = await githubApi.getRepositorySummary();
+      githubContributors = [...new Set(summary.recentCommits.map((c) => c.author))];
+    } catch {
+      // ignore github errors
+    }
+
     const ai = await aiApi.assignTasks({
       projectId: args.projectId,
       tasks: candidateTasks,
       members,
       maxAssignments: args.maxAssignments,
+      githubContributors,
     });
 
     const taskById = new Map(candidateTasks.map((task) => [task.id, task]));
@@ -748,9 +758,20 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
   });
 
   register(COMMANDS.inviteMember, async (args: InviteMemberArgs) => {
+    let targetUserId = args.userId;
+    // If not a UUID, try to resolve via profiles
+    if (!UUID_RE.test(targetUserId)) {
+      const resolved = await api.findUserByEmailOrUsername(targetUserId);
+      if (resolved) {
+        targetUserId = resolved;
+      } else {
+        // If resolution failed, we can't proceed with a non-UUID
+        throw new Error(`Could not find user '${targetUserId}' in Supabase. They must sign in to the app first.`);
+      }
+    }
     const data = await api.addProjectMember({
       projectId: args.projectId,
-      userId: args.userId,
+      userId: targetUserId,
       role: args.role ?? "member",
     });
     output.appendLine(`[${COMMANDS.inviteMember}] project=${args.projectId} user=${args.userId}`);
@@ -795,7 +816,7 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
 
   register(COMMANDS.updateTaskAssignee, async (args: UpdateTaskAssigneeArgs) => {
     const data = await api.updateTaskAssignee(args.id, args.assigneeId);
-    output.appendLine(`[${COMMANDS.updateTaskAssignee}] id=${args.id} assignee=${args.assigneeId ?? "unassigned"}`);
+    output.appendLine(`[${COMMANDS.updateTaskAssignee}] id=${args.id} assignee=${args.assigneeId}`);
     return ok(data);
   });
 
@@ -844,20 +865,81 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
         } else {
           geminiMentionCooldown.set(cooldownKey, now);
           const [existingTasks, recentMessages] = await Promise.all([
-            api.listTasksByProject(args.projectId),
+            api.listTasksByProject(args.projectId), // Needed for both reply and assignment
             api.listMessagesByProject(args.projectId, 20),
           ]);
 
-        const reply = await aiApi.generateMentionReply({
-          projectId: args.projectId,
-          message: args.text,
-          existingTasks,
-          recentMessages,
-        });
+          let replyText = "";
+
+          // Check for assignment intent
+          if (hasAssignIntent(safeText)) {
+            // Trigger assignment logic
+            const members = await api.listProjectMembers(args.projectId);
+            // Filter for backlog/in_progress tasks or unassigned ones
+            const candidateTasks = existingTasks.filter((t) => !t.assignee_id && t.status !== "done").slice(0, 20);
+
+            if (candidateTasks.length === 0) {
+              // Try to detect creation intent if no tasks exist to assign
+              // Example: "assign task to fix bug", "create task update readme"
+              const createMatch = safeText.match(/\b(?:assign|create)\s+(?:new\s+)?task\s+(?:to\s+\w+\s+)?(.+)/i);
+
+              if (createMatch && createMatch[1].trim()) {
+                const title = createMatch[1].trim().replace(/^to\s+/i, ""); // Clean up leading "to" if "assign task to fix..."
+                const newTask = await api.createTask({
+                  project_id: args.projectId,
+                  title: title,
+                  status: "backlog",
+                  assignee_id: null,
+                });
+                replyText = `I've created a new task: "${newTask.title}".`;
+              } else {
+                replyText = "I couldn't find any unassigned tasks to distribute.";
+              }
+            } else {
+              let githubContributors: string[] = [];
+              try {
+                const summary = await githubApi.getRepositorySummary();
+                githubContributors = [...new Set(summary.recentCommits.map((c) => c.author))];
+              } catch {
+                // ignore
+              }
+
+              const ai = await aiApi.assignTasks({
+                projectId: args.projectId,
+                tasks: candidateTasks,
+                members,
+                maxAssignments: 5, // Limit auto-assignment from chat
+                githubContributors,
+              });
+
+              // Persist assignments
+              const validAssignments = ai.assignments.filter((a) =>
+                candidateTasks.some((t) => t.id === a.taskId) && members.some((m) => m.user_id === a.assigneeId)
+              );
+
+              if (validAssignments.length > 0) {
+                await Promise.all(
+                  validAssignments.map((assignment) => api.updateTaskAssignee(assignment.taskId, assignment.assigneeId))
+                );
+                replyText = `I've assigned ${validAssignments.length} tasks based on workload and context. Check the board for updates.`;
+              } else {
+                replyText = "I analyzed the tasks but couldn't determine confident assignments right now.";
+              }
+            }
+          } else {
+            // Standard chat reply
+            const reply = await aiApi.generateMentionReply({
+              projectId: args.projectId,
+              message: args.text,
+              existingTasks,
+              recentMessages,
+            });
+            replyText = reply.text;
+          }
 
           const geminiMessage = await api.sendMessage({
             project_id: args.projectId,
-            text: reply.text,
+            text: replyText,
             author_id: args.authorId,
             sender_kind: "assistant",
             sender_label: "gemini",

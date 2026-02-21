@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useStore } from "../../state/store";
-import { updateTaskStatus } from "../hooks/useTasks";
+import { updateTaskStatus, updateTaskAssignee } from "../hooks/useTasks";
 import { LoadingState, EmptyState } from "./StatusState";
-import type { Task, TaskStatus } from "../../types";
+import { backendClient, BACKEND_COMMANDS } from "../utils/backendClient";
+import type { Task, TaskStatus, ProjectMember } from "../../types";
 
 const STATUSES: { value: TaskStatus | "all"; label: string; color: string }[] = [
   { value: "all", label: "All Tasks", color: "text-text-muted" },
@@ -29,8 +30,9 @@ const StatusBadge: React.FC<{ status: TaskStatus }> = ({ status }) => {
 const TaskRow: React.FC<{
   task: Task;
   selected: boolean;
+  assigneeLabel?: string;
   onClick: () => void;
-}> = ({ task, selected, onClick }) => (
+}> = ({ task, selected, assigneeLabel, onClick }) => (
   <div
     onClick={onClick}
     className={`flex items-center gap-4 px-5 py-3.5 border-b border-white/5 cursor-pointer transition-colors group
@@ -52,6 +54,14 @@ const TaskRow: React.FC<{
           {tag}
         </span>
       ))}
+      {assigneeLabel && (
+        <span
+          className="px-1.5 py-0.5 rounded-sm bg-primary/10 text-[10px] font-mono text-primary border border-primary/20"
+          title={assigneeLabel}
+        >
+          {assigneeLabel}
+        </span>
+      )}
       <StatusBadge status={task.status} />
     </div>
   </div>
@@ -59,8 +69,30 @@ const TaskRow: React.FC<{
 
 const TaskDetail: React.FC<{ task: Task }> = ({ task }) => {
   const { updateTask, moveTask } = useStore();
+  const project = useStore((s) => s.project);
+  const currentUser = useStore((s) => s.currentUser);
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
+  const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [githubContributors, setGithubContributors] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!project?.id) return;
+    let mounted = true;
+    backendClient.listMembers<ProjectMember[]>(project.id).then((list) => {
+      if (mounted) setMembers(list);
+    }).catch(() => {
+      // ignore error
+    });
+
+    backendClient.getGithubRepoSummary<{ recentCommits: { author: string }[] }>().then((summary) => {
+      if (mounted && summary?.recentCommits) {
+        setGithubContributors([...new Set(summary.recentCommits.map((c) => c.author))]);
+      }
+    }).catch(() => {});
+
+    return () => { mounted = false; };
+  }, [project?.id]);
 
   const NEXT_STATUS: Record<TaskStatus, TaskStatus | null> = {
     backlog: "in_progress",
@@ -126,6 +158,53 @@ const TaskDetail: React.FC<{ task: Task }> = ({ task }) => {
           </div>
         </div>
       )}
+
+      {/* Assignee Picker */}
+      <div className="mb-6">
+        <p className="text-xs font-mono text-text-dim uppercase mb-2">Assignee</p>
+        <select
+          value={task.assignee_id || ""}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (!val.startsWith("gh:")) {
+              const newAssignee = val || null;
+              updateTask(task.id, { assignee_id: newAssignee });
+              updateTaskAssignee(task.id, newAssignee).catch(() => {
+                // Rollback
+                updateTask(task.id, { assignee_id: task.assignee_id });
+              });
+            }
+          }}
+          className="w-full bg-white/5 border border-white/10 rounded-sm px-3 py-2 text-sm text-text-main outline-none focus:border-primary/50 font-mono"
+        >
+          <option value="">Unassigned</option>
+          {currentUser && !members.some((m) => m.user_id === currentUser.uid) && (
+            <option value={currentUser.uid}>
+              Me ({currentUser.email || currentUser.displayName || "User"})
+            </option>
+          )}
+          {members.map((m) => {
+            const isMe = m.user_id === currentUser?.uid;
+            const label = isMe
+              ? `Me (${currentUser?.email || currentUser?.displayName || "User"})`
+              : `${m.user_id.slice(0, 8)}... (${m.role})`;
+            return (
+              <option key={m.user_id} value={m.user_id}>
+                {label}
+              </option>
+            );
+          })}
+          {githubContributors.filter(c => {
+             if (currentUser?.displayName && c.toLowerCase() === currentUser.displayName.toLowerCase()) return false;
+             if (currentUser?.email && currentUser.email.toLowerCase().includes(c.toLowerCase())) return false;
+             return true;
+          }).map((c) => (
+            <option key={c} value={`gh:${c}`} disabled className="text-text-dim">
+              {c} (GitHub - Invite needed)
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Meta grid */}
       <div className="grid grid-cols-2 gap-4 mb-8">
@@ -195,11 +274,35 @@ const TaskDetail: React.FC<{ task: Task }> = ({ task }) => {
 const TasksView: React.FC = () => {
   const tasks = useStore((s) => s.tasks);
   const tasksLoading = useStore((s) => s.tasksLoading);
+  const project = useStore((s) => s.project);
   const safeTasks = Array.isArray(tasks) ? tasks : [];
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "all">("all");
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(safeTasks[0]?.id ?? null);
+  const currentUser = useStore((s) => s.currentUser);
+
+  const [isCreating, setIsCreating] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [createLoading, setCreateLoading] = useState(false);
+
+  const handleCreateTask = async () => {
+    if (!newTaskTitle.trim() || !project?.id) return;
+    setCreateLoading(true);
+    try {
+      await backendClient.execute(BACKEND_COMMANDS.createTask, {
+        projectId: project.id,
+        title: newTaskTitle.trim(),
+        status: "backlog",
+      });
+      setNewTaskTitle("");
+      setIsCreating(false);
+    } catch (error) {
+      console.error("Failed to create task:", error);
+    } finally {
+      setCreateLoading(false);
+    }
+  };
 
   const filtered = safeTasks.filter((t) => {
     if (filterStatus !== "all" && t.status !== filterStatus) return false;
@@ -268,7 +371,37 @@ const TasksView: React.FC = () => {
       {/* Task List */}
       <div className="flex flex-col w-full md:w-[320px] shrink-0 border-r border-border-dark bg-[#111113] overflow-hidden">
         {/* Search header */}
-        <div className="p-4 border-b border-border-dark">
+        <div className="p-4 border-b border-border-dark flex flex-col gap-3">
+          <button
+            onClick={() => setIsCreating(true)}
+            className="w-full h-9 bg-primary text-white text-xs font-medium rounded-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[16px]">add</span>
+            Create Task
+          </button>
+
+          {isCreating && (
+            <div className="bg-surface-dark border border-white/10 rounded-sm p-3 animate-in fade-in slide-in-from-top-2">
+              <input
+                autoFocus
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateTask();
+                  if (e.key === "Escape") setIsCreating(false);
+                }}
+                placeholder="Task title..."
+                className="w-full bg-white/5 border border-white/10 rounded-sm px-2.5 py-1.5 text-xs text-text-main outline-none focus:border-primary/50 mb-2"
+              />
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setIsCreating(false)} className="text-[10px] text-text-muted hover:text-white">Cancel</button>
+                <button onClick={handleCreateTask} disabled={createLoading} className="text-[10px] text-primary hover:text-primary/80 font-medium disabled:opacity-50">
+                  {createLoading ? "Creating..." : "Create"}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-2 bg-surface-dark border border-white/5 rounded-sm px-3 py-2">
             <span className="material-symbols-outlined text-[16px] text-text-dim">search</span>
             <input
@@ -295,14 +428,21 @@ const TasksView: React.FC = () => {
               <p className="text-xs font-mono">No tasks found</p>
             </div>
           ) : (
-            filtered.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                selected={selectedId === task.id}
-                onClick={() => setSelectedId(task.id)}
-              />
-            ))
+            filtered.map((task) => {
+              let assigneeLabel = undefined;
+              if (task.assignee_id) {
+                assigneeLabel = task.assignee_id === currentUser?.uid ? "ME" : "USR";
+              }
+              return (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  selected={selectedId === task.id}
+                  assigneeLabel={assigneeLabel}
+                  onClick={() => setSelectedId(task.id)}
+                />
+              );
+            })
           )}
         </div>
       </div>

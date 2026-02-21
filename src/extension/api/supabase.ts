@@ -32,6 +32,15 @@ export class CopilotColabSupabaseApi {
       .single();
 
     ensureNoError(error);
+
+    // Auto-add creator as owner in project_members
+    if (data) {
+      await this.client.from("project_members").insert({
+        project_id: data.id,
+        user_id: input.createdBy,
+        role: "owner",
+      });
+    }
     return data as Project;
   }
 
@@ -45,6 +54,20 @@ export class CopilotColabSupabaseApi {
 
     ensureNoError(error);
     return (data as Project | null) ?? null;
+  }
+
+  async findUserByEmailOrUsername(query: string): Promise<string | null> {
+    // Try email match
+    const { data: emailData } = await this.client
+      .from("profiles")
+      .select("id")
+      .ilike("email", query)
+      .maybeSingle();
+    if (emailData) return emailData.id;
+
+    // Try username match
+    const { data: userData } = await this.client.from("profiles").select("id").ilike("username", query).maybeSingle();
+    return userData?.id ?? null;
   }
 
   async addProjectMember(input: {

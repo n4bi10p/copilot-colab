@@ -40,6 +40,7 @@ export interface AssignTasksInput {
   tasks: Task[];
   members: ProjectMember[];
   maxAssignments?: number;
+  githubContributors?: string[];
 }
 
 export interface AssignTasksOutput {
@@ -217,6 +218,7 @@ export class CopilotColabAiApi {
       `projectId: ${input.projectId}`,
       `maxAssignments: ${maxAssignments}`,
       "",
+      `GitHub Contributors (context only): ${input.githubContributors?.join(", ") ?? "none"}`,
       "members:",
       JSON.stringify(memberRows),
       "",

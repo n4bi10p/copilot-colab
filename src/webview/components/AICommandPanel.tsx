@@ -387,7 +387,7 @@ const AICommandPanel: React.FC = () => {
           <input
             value={memberUserId}
             onChange={(e) => setMemberUserId(e.target.value)}
-            placeholder="Member user UUID"
+            placeholder="Member Email, Username, or UUID"
             className="w-full h-8 bg-white/5 border border-white/10 rounded-sm px-2.5 text-[11px] font-mono text-text-main outline-none focus:border-primary/50"
           />
           <div className="grid grid-cols-2 gap-2">
