@@ -67,7 +67,14 @@ const NavRail: React.FC = () => {
 
       {/* Bottom */}
       <div className="mt-auto flex flex-col gap-4 w-full px-2 relative">
-        <button className="group flex items-center justify-center p-3 rounded-lg text-text-muted hover:text-white hover:bg-white/5 transition-colors">
+        <button
+          onClick={() => setActivePanel("settings")}
+          className={`group flex items-center justify-center p-3 rounded-lg transition-colors ${
+            activePanel === "settings"
+              ? "bg-surface-dark border border-white/5 text-white shadow-lg shadow-black/50"
+              : "text-text-muted hover:text-white hover:bg-white/5"
+          }`}
+        >
           <span className="material-symbols-outlined text-[24px]">settings</span>
         </button>
 

@@ -74,7 +74,7 @@ interface AppState {
   removeToast: (id: string) => void;
 
   // UI
-  activePanel: "dashboard" | "tasks" | "agent" | "terminal";
+  activePanel: "dashboard" | "tasks" | "agent" | "terminal" | "settings";
   setActivePanel: (panel: AppState["activePanel"]) => void;
 
   // Session

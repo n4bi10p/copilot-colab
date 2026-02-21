@@ -6,6 +6,7 @@ import AgentPanel from "./components/AgentPanel";
 import TasksView from "./components/TasksView";
 import AgentView from "./components/AgentView";
 import TerminalView from "./components/TerminalView";
+import SettingsPanel from "./components/SettingsPanel";
 import AuthGate from "./components/AuthGate";
 import ToastContainer from "./components/ToastContainer";
 import { useStore } from "../state/store";
@@ -225,6 +226,7 @@ const App: React.FC = () => {
           {activePanel === "tasks" && <TasksView />}
           {activePanel === "agent" && <AgentView />}
           {activePanel === "terminal" && <TerminalView />}
+          {activePanel === "settings" && <SettingsPanel />}
         </div>
       )}
     </>
