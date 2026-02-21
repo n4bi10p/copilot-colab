@@ -39,29 +39,33 @@ export class CopilotColabSupabaseApi {
     userId: string;
     role?: ProjectMemberRole;
   }): Promise<ProjectMember> {
-    const { data, error } = await this.client
-      .from("project_members")
-      .insert({
-        project_id: input.projectId,
-        user_id: input.userId,
-        role: input.role ?? "member",
-      })
-      .select("*")
-      .single();
+    const { data, error } = await this.client.rpc("invite_member", {
+      p_project_id: input.projectId,
+      p_user_id: input.userId,
+      p_role: input.role ?? "member",
+    });
 
     ensureNoError(error);
     return data as ProjectMember;
   }
 
   async listProjectMembers(projectId: string): Promise<ProjectMember[]> {
-    const { data, error } = await this.client
-      .from("project_members")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: true });
+    const { data, error } = await this.client.rpc("list_project_members", {
+      p_project_id: projectId,
+    });
 
     ensureNoError(error);
     return (data ?? []) as ProjectMember[];
+  }
+
+  async removeProjectMember(input: { projectId: string; userId: string }): Promise<boolean> {
+    const { data, error } = await this.client.rpc("remove_member", {
+      p_project_id: input.projectId,
+      p_user_id: input.userId,
+    });
+
+    ensureNoError(error);
+    return Boolean(data);
   }
 
   async listTasksByProject(projectId: string): Promise<Task[]> {

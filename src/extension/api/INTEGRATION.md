@@ -16,11 +16,14 @@ This file maps extension-side API wrappers to `supabase/contracts.md`.
   - table: `projects`
   - contract section: create project
 - `addProjectMember({ projectId, userId, role })`
-  - table: `project_members`
-  - contract section: invite/add member
+  - RPC: `invite_member`
+  - contract section: membership RPC
 - `listProjectMembers(projectId)`
-  - table: `project_members`
-  - contract section: list project members
+  - RPC: `list_project_members`
+  - contract section: membership RPC
+- `removeProjectMember({ projectId, userId })`
+  - RPC: `remove_member`
+  - contract section: membership RPC
 - `listTasksByProject(projectId)`
   - table: `tasks`
   - contract section: list tasks by project

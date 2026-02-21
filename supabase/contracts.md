@@ -141,24 +141,33 @@ supabase.from("projects").insert({
 supabase.from("projects").select("*").order("created_at", { ascending: false });
 ```
 
-### Invite/add member to a project (owner only)
+### Invite/add member to a project (owner only, RPC)
+
+Preferred:
 
 ```ts
-supabase.from("project_members").insert({
-  project_id: projectId,
-  user_id: invitedUserId,
-  role: "member",
+supabase.rpc("invite_member", {
+  p_project_id: projectId,
+  p_user_id: invitedUserId,
+  p_role: "member",
 });
 ```
 
-### List project members
+### Remove member from project (owner, or self-leave, RPC)
 
 ```ts
-supabase
-  .from("project_members")
-  .select("*")
-  .eq("project_id", projectId)
-  .order("created_at", { ascending: true });
+supabase.rpc("remove_member", {
+  p_project_id: projectId,
+  p_user_id: targetUserId,
+});
+```
+
+### List project members (owner/member, RPC)
+
+```ts
+supabase.rpc("list_project_members", {
+  p_project_id: projectId,
+});
 ```
 
 ### Create task
@@ -271,6 +280,19 @@ Frontend should map common Postgres/Supabase errors:
 - `23503` (foreign key violation): show "Invalid project/user reference."
 - `23514` (check violation): show "Invalid status value."
 - `23505` (unique violation on `presence.user_id` without upsert): retry with `upsert`.
+
+## Membership RPC contract
+
+- `invite_member(p_project_id uuid, p_user_id uuid, p_role text default 'member')`
+  - returns: `project_members` row
+  - allowed: project owner only
+- `remove_member(p_project_id uuid, p_user_id uuid)`
+  - returns: `boolean`
+  - allowed: project owner for removals, or member removing self
+  - disallows removing project creator from membership
+- `list_project_members(p_project_id uuid)`
+  - returns: set of `project_members`
+  - allowed: project owner and project members
 
 ## Versioning
 
