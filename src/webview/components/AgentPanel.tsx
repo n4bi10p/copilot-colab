@@ -189,7 +189,7 @@ const AgentPanel: React.FC = () => {
 
         {/* Deploy button */}
         <button className="w-full flex items-center justify-between p-4 bg-primary text-white rounded-sm hover:bg-primary/90 transition-colors group">
-          <span className="text-sm font-medium tracking-wide">DEPLOY TO STAGING</span>
+          <span className="text-sm font-medium tracking-wide">DEPLOY TO BRANCH</span>
           <span className="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">
             arrow_forward
           </span>
