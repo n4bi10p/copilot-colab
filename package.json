@@ -18,6 +18,7 @@
     "onCommand:copilotColab.auth.signUpWithPassword",
     "onCommand:copilotColab.auth.signOut",
     "onCommand:copilotColab.ai.generateWbs",
+    "onCommand:copilotColab.ai.smokeTest",
     "onCommand:copilotColab.project.create",
     "onCommand:copilotColab.member.invite",
     "onCommand:copilotColab.member.remove",
@@ -57,6 +58,10 @@
       {
         "command": "copilotColab.ai.generateWbs",
         "title": "Copilot CoLab: AI Generate WBS"
+      },
+      {
+        "command": "copilotColab.ai.smokeTest",
+        "title": "Copilot CoLab: AI Smoke Test"
       },
       {
         "command": "copilotColab.project.create",

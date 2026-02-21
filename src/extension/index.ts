@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import { createClient } from "@supabase/supabase-js";
 import { CopilotColabAiApi } from "./api/ai";
 import { CopilotColabAuthApi } from "./api/auth";
+import { VscodeSecretStorageAdapter } from "./api/authStorage";
 import { CopilotColabGithubApi } from "./api/github";
 import { CopilotColabRealtimeApi } from "./api/realtime";
 import { CopilotColabSupabaseApi } from "./api/supabase";
@@ -83,7 +84,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     return;
   }
 
-  const client = createClient(config.url, config.anonKey);
+  const client = createClient(config.url, config.anonKey, {
+    auth: {
+      storage: new VscodeSecretStorageAdapter(context.secrets),
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+    },
+  });
   const aiApi = new CopilotColabAiApi({
     apiKey: readEnv("GEMINI_API_KEY"),
     model: readEnv("GEMINI_MODEL"),

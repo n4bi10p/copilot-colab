@@ -27,28 +27,32 @@ export class CopilotColabGithubApi {
       return null;
     }
 
-    const headers = {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${this.token}`,
-      "X-GitHub-Api-Version": "2022-11-28",
-    };
+    try {
+      const headers = {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${this.token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+      };
 
-    const [commitsRes, pullsRes] = await Promise.all([
-      fetch(`https://api.github.com/repos/${this.repository}/commits?per_page=5`, { headers }),
-      fetch(`https://api.github.com/repos/${this.repository}/pulls?state=open&per_page=5`, { headers }),
-    ]);
+      const [commitsRes, pullsRes] = await Promise.all([
+        fetch(`https://api.github.com/repos/${this.repository}/commits?per_page=5`, { headers }),
+        fetch(`https://api.github.com/repos/${this.repository}/pulls?state=open&per_page=5`, { headers }),
+      ]);
 
-    if (!commitsRes.ok || !pullsRes.ok) {
+      if (!commitsRes.ok || !pullsRes.ok) {
+        return null;
+      }
+
+      const commitsPayload = (await commitsRes.json()) as Array<{ commit?: { message?: string } }>;
+      const pullsPayload = (await pullsRes.json()) as Array<{ title?: string }>;
+
+      return {
+        repository: this.repository,
+        commits: commitsPayload.map((item) => String(item.commit?.message ?? "")).filter(Boolean).slice(0, 5),
+        pullRequests: pullsPayload.map((item) => String(item.title ?? "")).filter(Boolean).slice(0, 5),
+      };
+    } catch {
       return null;
     }
-
-    const commitsPayload = (await commitsRes.json()) as Array<{ commit?: { message?: string } }>;
-    const pullsPayload = (await pullsRes.json()) as Array<{ title?: string }>;
-
-    return {
-      repository: this.repository,
-      commits: commitsPayload.map((item) => String(item.commit?.message ?? "")).filter(Boolean).slice(0, 5),
-      pullRequests: pullsPayload.map((item) => String(item.title ?? "")).filter(Boolean).slice(0, 5),
-    };
   }
 }

@@ -10,6 +10,13 @@ export interface PasswordAuthInput {
 export class CopilotColabAuthApi {
   constructor(private readonly client: ApiClient) {}
 
+  private isMissingSessionError(error: { message: string } | null): boolean {
+    if (!error) {
+      return false;
+    }
+    return /auth session missing/i.test(error.message);
+  }
+
   async getSession(): Promise<AuthSession | null> {
     const { data, error } = await this.client.auth.getSession();
     if (error) {
@@ -21,6 +28,9 @@ export class CopilotColabAuthApi {
   async getCurrentUser(): Promise<User | null> {
     const { data, error } = await this.client.auth.getUser();
     if (error) {
+      if (this.isMissingSessionError(error)) {
+        return null;
+      }
       throw new Error(error.message);
     }
     return data.user;
