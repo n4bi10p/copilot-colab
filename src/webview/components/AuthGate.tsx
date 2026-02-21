@@ -38,6 +38,15 @@ const AuthGate: React.FC<AuthGateProps> = ({ sessionExpired = false }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) return;
+    // Basic validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -52,7 +61,19 @@ const AuthGate: React.FC<AuthGateProps> = ({ sessionExpired = false }) => {
       setCurrentUser(user);
       setSessionExpired(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Auth failed");
+      const msg = err instanceof Error ? err.message : "Auth failed";
+      // Categorize errors for user-friendly messages
+      if (/invalid.*credentials|invalid.*password|invalid.*email/i.test(msg)) {
+        setError("Invalid email or password. Please try again.");
+      } else if (/rate.limit|too.many/i.test(msg)) {
+        setError("Too many attempts. Please wait a moment and try again.");
+      } else if (/network|fetch|timeout/i.test(msg)) {
+        setError("Network error. Check your connection and try again.");
+      } else if (/already.*registered|already.*exists/i.test(msg)) {
+        setError("This email is already registered. Try signing in instead.");
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

@@ -13,10 +13,13 @@ const NavRail: React.FC = () => {
   const { activePanel, setActivePanel } = useStore();
   const currentUser = useStore((s) => s.currentUser);
   const resetState = useStore((s) => s.resetState);
+  const unreadCount = useStore((s) => s.unreadCount);
   const [showMenu, setShowMenu] = useState(false);
 
   const handleSignOut = async () => {
     setShowMenu(false);
+    const confirmed = window.confirm("Sign out of Copilot CoLab?");
+    if (!confirmed) return;
     try {
       await backendClient.signOut();
     } catch {
@@ -45,13 +48,19 @@ const NavRail: React.FC = () => {
           <button
             key={panel}
             onClick={() => setActivePanel(panel)}
-            className={`group flex items-center justify-center p-3 rounded-lg transition-colors ${
+            className={`group relative flex items-center justify-center p-3 rounded-lg transition-colors ${
               activePanel === panel
                 ? "bg-surface-dark border border-white/5 text-white shadow-lg shadow-black/50"
                 : "text-text-muted hover:text-white hover:bg-white/5"
             }`}
           >
             <span className="material-symbols-outlined text-[24px]">{icon}</span>
+            {/* Unread badge on chat panel */}
+            {panel === "agent" && unreadCount > 0 && activePanel !== "agent" && (
+              <span className="absolute -top-1 -right-1 size-4 bg-primary rounded-full flex items-center justify-center text-[9px] font-mono text-white font-bold">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
           </button>
         ))}
       </div>

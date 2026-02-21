@@ -51,6 +51,7 @@ export const BACKEND_COMMANDS = {
   subscribeProject: "copilotColab.realtime.subscribeProject",
   unsubscribeProject: "copilotColab.realtime.unsubscribeProject",
   realtimeHealth: "copilotColab.realtime.health",
+  updateTaskAssignee: "copilotColab.tasks.updateAssignee",
 } as const;
 
 export class BackendClient {
@@ -204,6 +205,44 @@ export class BackendClient {
     commitTitle?: string;
   }): Promise<T> {
     return this.execute<T>(BACKEND_COMMANDS.githubMergePr, args, 20_000);
+  }
+
+  // ── Messages ──────────────────────────────────────────────────────────────
+
+  listMessages<T = unknown>(projectId: string): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.listMessages, { projectId });
+  }
+
+  sendMessage<T = unknown>(projectId: string, text: string, authorId: string): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.sendMessage, { projectId, text, authorId }, 30_000);
+  }
+
+  sendMessageAndList<T = unknown>(projectId: string, text: string, authorId: string, limit = 100): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.sendMessageAndList, { projectId, text, authorId, limit }, 30_000);
+  }
+
+  // ── Members ───────────────────────────────────────────────────────────────
+
+  listMembers<T = unknown>(projectId: string): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.listMembers, { projectId });
+  }
+
+  // ── Tasks ─────────────────────────────────────────────────────────────────
+
+  listTasks<T = unknown>(projectId: string): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.listTasks, { projectId });
+  }
+
+  createTask<T = unknown>(projectId: string, title: string, assigneeId?: string | null): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.createTask, { projectId, title, assigneeId });
+  }
+
+  updateTaskStatus<T = unknown>(id: string, status: string): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.updateTaskStatus, { id, status });
+  }
+
+  updateTaskAssignee<T = unknown>(id: string, assigneeId: string | null): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.updateTaskAssignee, { id, assigneeId });
   }
 
   private makeRequestId(): string {

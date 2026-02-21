@@ -7,6 +7,7 @@ import TasksView from "./components/TasksView";
 import AgentView from "./components/AgentView";
 import TerminalView from "./components/TerminalView";
 import AuthGate from "./components/AuthGate";
+import ToastContainer from "./components/ToastContainer";
 import { useStore } from "../state/store";
 import { useAuth } from "./hooks/useAuth";
 import { useTasksListener } from "./hooks/useTasks";
@@ -52,6 +53,7 @@ const ProjectBootstrap: React.FC = () => {
   const currentUser = useStore((s) => s.currentUser);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [noRepo, setNoRepo] = useState(false);
 
   React.useEffect(() => {
     if (!currentUser?.uid) return;
@@ -60,6 +62,7 @@ const ProjectBootstrap: React.FC = () => {
     const bootstrap = async () => {
       setLoading(true);
       setError(null);
+      setNoRepo(false);
 
       const cached = readCachedProject();
       if (cached && !cancelled) {
@@ -99,13 +102,16 @@ const ProjectBootstrap: React.FC = () => {
           }
         } catch (fallbackErr) {
           if (!cancelled) {
-            setError(
-              fallbackErr instanceof Error
-                ? fallbackErr.message
-                : err instanceof Error
-                ? err.message
-                : "Failed to initialize workspace."
-            );
+            const msg = fallbackErr instanceof Error
+              ? fallbackErr.message
+              : err instanceof Error
+              ? err.message
+              : "Failed to initialize workspace.";
+            // Detect repo-not-found or network errors
+            if (/repo|repository|not found/i.test(msg)) {
+              setNoRepo(true);
+            }
+            setError(msg);
           }
         }
       } finally {
@@ -141,6 +147,24 @@ const ProjectBootstrap: React.FC = () => {
               <span className="size-4 border-2 border-white/20 border-t-primary rounded-full animate-spin" />
               <span className="text-sm">Initializing project...</span>
             </div>
+          ) : noRepo ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start gap-2.5 p-3 rounded-sm bg-yellow-500/10 border border-yellow-500/20">
+                <span className="material-symbols-outlined text-yellow-500 text-[18px] shrink-0 mt-0.5">folder_off</span>
+                <div>
+                  <p className="text-xs text-yellow-400 font-medium mb-1">No repository detected</p>
+                  <p className="text-[11px] text-text-muted leading-relaxed">
+                    Open a Git repository in VS Code, then retry. Copilot CoLab needs a repo context to set up your workspace.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full h-10 bg-primary hover:bg-primary/90 text-white text-sm font-medium rounded-sm transition-colors"
+              >
+                Retry
+              </button>
+            </div>
           ) : error ? (
             <div className="flex flex-col gap-3">
               <p className="text-xs text-red-400 font-mono">{error}</p>
@@ -174,8 +198,9 @@ const App: React.FC = () => {
 
   if (!authReady) {
     return (
-      <div className="min-h-screen bg-[#111113] flex items-center justify-center">
+      <div className="min-h-screen bg-[#111113] flex flex-col items-center justify-center gap-3">
         <span className="size-6 border-2 border-white/10 border-t-primary rounded-full animate-spin" />
+        <span className="text-xs font-mono text-text-dim">Restoring session…</span>
       </div>
     );
   }
@@ -185,6 +210,7 @@ const App: React.FC = () => {
 
   return (
     <>
+      <ToastContainer />
       <RealtimeListeners />
       {activePanel === "dashboard" ? (
         <div className="dashboard-grid bg-background-dark selection:bg-primary/30 selection:text-white">

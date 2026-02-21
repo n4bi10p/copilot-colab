@@ -43,6 +43,7 @@ export const COMMANDS = {
   listTasks: "copilotColab.tasks.list",
   createTask: "copilotColab.tasks.create",
   updateTaskStatus: "copilotColab.tasks.updateStatus",
+  updateTaskAssignee: "copilotColab.tasks.updateAssignee",
   listMessages: "copilotColab.messages.list",
   subscribeStateMessages: "copilotColab.messages.subscribeState",
   sendMessage: "copilotColab.messages.send",
@@ -108,6 +109,11 @@ interface CreateTaskArgs {
 interface UpdateTaskStatusArgs {
   id: string;
   status: TaskStatus;
+}
+
+interface UpdateTaskAssigneeArgs {
+  id: string;
+  assigneeId: string | null;
 }
 
 interface SendMessageArgs {
@@ -780,6 +786,12 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
   register(COMMANDS.updateTaskStatus, async (args: UpdateTaskStatusArgs) => {
     const data = await api.updateTaskStatus(args.id, args.status);
     output.appendLine(`[${COMMANDS.updateTaskStatus}] id=${args.id} status=${args.status}`);
+    return ok(data);
+  });
+
+  register(COMMANDS.updateTaskAssignee, async (args: UpdateTaskAssigneeArgs) => {
+    const data = await api.updateTaskAssignee(args.id, args.assigneeId);
+    output.appendLine(`[${COMMANDS.updateTaskAssignee}] id=${args.id} assignee=${args.assigneeId ?? "unassigned"}`);
     return ok(data);
   });
 

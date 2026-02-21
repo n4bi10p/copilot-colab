@@ -1,13 +1,15 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../../state/store";
-import { backendClient, BACKEND_COMMANDS } from "../utils/backendClient";
-import type { Message } from "../../types";
+import { backendClient } from "../utils/backendClient";
+import type { Message, ProjectMember } from "../../types";
 
 const POLL_INTERVAL_MS = 5_000;
 
-// Subscribe to messages for the current project � polls every 5 s
+// Subscribe to messages for the current project — polls every 5 s
 export function useMessagesListener(): void {
   const setMessages = useStore((s) => s.setMessages);
+  const setMessagesLoading = useStore((s) => s.setMessagesLoading);
+  const setMembers = useStore((s) => s.setMembers);
   const project = useStore((s) => s.project);
   const user = useStore((s) => s.currentUser);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -16,9 +18,19 @@ export function useMessagesListener(): void {
     if (!project?.id || !user) return;
     const projectId = project.id;
 
+    setMessagesLoading(true);
+
+    // Load members once per project
+    backendClient
+      .listMembers<ProjectMember[]>(projectId)
+      .then((raw) => {
+        if (Array.isArray(raw)) setMembers(raw);
+      })
+      .catch(() => { /* offline – skip */ });
+
     const fetchMessages = () => {
       backendClient
-        .execute<Message[]>(BACKEND_COMMANDS.listMessages, { projectId })
+        .listMessages<Message[]>(projectId)
         .then((raw) => setMessages(Array.isArray(raw) ? raw : []))
         .catch(() => { /* offline/preview mode */ });
     };
@@ -33,5 +45,5 @@ export function useMessagesListener(): void {
 }
 
 export async function sendMessage(projectId: string, text: string, authorId: string): Promise<void> {
-  await backendClient.execute(BACKEND_COMMANDS.sendMessage, { projectId, text, authorId });
+  await backendClient.sendMessage(projectId, text, authorId);
 }

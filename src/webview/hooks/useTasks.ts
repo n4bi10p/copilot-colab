@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../../state/store";
-import { backendClient, BACKEND_COMMANDS } from "../utils/backendClient";
+import { backendClient } from "../utils/backendClient";
 import type { Task, TaskStatus } from "../../types";
 
 const POLL_INTERVAL_MS = 5_000;
@@ -22,7 +22,7 @@ export function useTasksListener(): void {
 
     const fetchTasks = () => {
       backendClient
-        .execute<Task[]>(BACKEND_COMMANDS.listTasks, { projectId })
+        .listTasks<Task[]>(projectId)
         .then((raw) => setTasks(Array.isArray(raw) ? raw : []))
         .catch(() => { /* offline/preview mode – keep current tasks */ });
     };
@@ -37,11 +37,18 @@ export function useTasksListener(): void {
 }
 
 /** Create a task – caller should do optimistic add before calling this */
-export async function createTask(projectId: string, title: string): Promise<void> {
-  await backendClient.execute(BACKEND_COMMANDS.createTask, { projectId, title });
+export async function createTask(projectId: string, title: string, assigneeId?: string | null): Promise<void> {
+  await backendClient.createTask(projectId, title, assigneeId);
 }
 
-/** Update task status – caller should do optimistic move before calling this */
+/** Update task status */
 export async function updateTaskStatus(id: string, status: TaskStatus): Promise<void> {
-  await backendClient.execute(BACKEND_COMMANDS.updateTaskStatus, { id, status });
+  await backendClient.updateTaskStatus(id, status);
 }
+
+/** Update task assignee */
+export async function updateTaskAssignee(id: string, assigneeId: string | null): Promise<void> {
+  await backendClient.updateTaskAssignee(id, assigneeId);
+}
+
+

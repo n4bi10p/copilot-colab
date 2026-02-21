@@ -179,10 +179,7 @@ export class CopilotColabSupabaseApi {
   async updateTaskAssignee(id: string, assigneeId: string | null): Promise<Task> {
     const { data, error } = await this.client
       .from("tasks")
-      .update({
-        assignee_id: assigneeId,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ assignee_id: assigneeId, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select("*")
       .single();

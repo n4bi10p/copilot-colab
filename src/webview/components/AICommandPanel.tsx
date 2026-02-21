@@ -21,6 +21,7 @@ const MODEL_OPTIONS = ["gpt-4.1", "gpt-4o", "gpt-5"];
 
 const AICommandPanel: React.FC = () => {
   const project = useStore((s) => s.project);
+  const addToast = useStore((s) => s.addToast);
   const [prompt, setPrompt] = useState("Explain this code and suggest concrete improvements.");
   const [model, setModel] = useState("gpt-4.1");
   const [loading, setLoading] = useState(false);
@@ -168,6 +169,20 @@ const AICommandPanel: React.FC = () => {
       setRepoError("PR title, head, and base are required.");
       return;
     }
+    // Branch name validation
+    const branchRe = /^[a-zA-Z0-9._\-/]+$/;
+    if (!branchRe.test(prHead.trim())) {
+      setRepoError("Head branch contains invalid characters.");
+      return;
+    }
+    if (!branchRe.test(prBase.trim())) {
+      setRepoError("Base branch contains invalid characters.");
+      return;
+    }
+    if (prHead.trim() === prBase.trim()) {
+      setRepoError("Head and base branches must be different.");
+      return;
+    }
     setRepoLoading(true);
     setRepoError(null);
     try {
@@ -181,10 +196,22 @@ const AICommandPanel: React.FC = () => {
         base: prBase.trim(),
         body: prBody.trim() || undefined,
       });
-      setGithubResult(`Created PR #${pr.number}: ${pr.title}`);
+      addToast({
+        id: `pr-create-${Date.now()}`,
+        type: "success",
+        message: `PR #${pr.number} created: ${pr.title}`,
+        link: pr.url ? { label: `View PR #${pr.number}`, url: pr.url } : undefined,
+      });
+      setPrTitle("");
+      setPrHead("");
+      setPrBase("main");
+      setPrBody("");
+      setGithubResult(null);
       await loadRepoSummary();
     } catch (err) {
-      setRepoError(err instanceof Error ? err.message : "Failed to create PR.");
+      const msg = err instanceof Error ? err.message : "Failed to create PR.";
+      setRepoError(msg);
+      addToast({ id: `pr-err-${Date.now()}`, type: "error", message: msg });
     } finally {
       setRepoLoading(false);
     }
@@ -203,10 +230,18 @@ const AICommandPanel: React.FC = () => {
         pullNumber,
         body: prComment.trim(),
       });
-      setGithubResult(`Comment posted on PR #${pullNumber} (comment id ${comment.id}).`);
+      addToast({
+        id: `pr-comment-${Date.now()}`,
+        type: "success",
+        message: `Comment posted on PR #${pullNumber}`,
+        link: comment.url ? { label: "View comment", url: comment.url } : undefined,
+      });
       setPrComment("");
+      setGithubResult(null);
     } catch (err) {
-      setRepoError(err instanceof Error ? err.message : "Failed to comment on PR.");
+      const msg = err instanceof Error ? err.message : "Failed to comment on PR.";
+      setRepoError(msg);
+      addToast({ id: `comment-err-${Date.now()}`, type: "error", message: msg });
     } finally {
       setRepoLoading(false);
     }
@@ -229,10 +264,19 @@ const AICommandPanel: React.FC = () => {
         pullNumber,
         method: "squash",
       });
-      setGithubResult(`Merge PR #${pullNumber}: ${result.message || (result.merged ? "merged" : "not merged")}`);
+      const msg = `PR #${pullNumber}: ${result.message || (result.merged ? "merged successfully" : "not merged")}`;
+      addToast({
+        id: `pr-merge-${Date.now()}`,
+        type: result.merged ? "success" : "error",
+        message: msg,
+      });
+      setGithubResult(null);
+      setPrNumberInput("");
       await loadRepoSummary();
     } catch (err) {
-      setRepoError(err instanceof Error ? err.message : "Failed to merge PR.");
+      const msg = err instanceof Error ? err.message : "Failed to merge PR.";
+      setRepoError(msg);
+      addToast({ id: `merge-err-${Date.now()}`, type: "error", message: msg });
     } finally {
       setRepoLoading(false);
     }

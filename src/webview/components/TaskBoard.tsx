@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useStore } from "../../state/store";
-import { createTask } from "../hooks/useTasks";
+import { createTask, updateTaskAssignee } from "../hooks/useTasks";
 import { LoadingState, EmptyState } from "./StatusState";
-import type { Task, TaskStatus } from "../../types";
+import type { Task, TaskStatus, ProjectMember } from "../../types";
 
 const COLUMNS: { status: TaskStatus; label: string }[] = [
   { status: "backlog", label: "Backlog" },
@@ -10,8 +10,82 @@ const COLUMNS: { status: TaskStatus; label: string }[] = [
   { status: "done", label: "Done" },
 ];
 
+// ── Assignee Dropdown ────────────────────────────────────────────────────────
+const AssigneeDropdown: React.FC<{
+  taskId: string;
+  currentAssignee: string | null | undefined;
+  members: ProjectMember[];
+}> = ({ taskId, currentAssignee, members }) => {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const updateTask = useStore((s) => s.updateTask);
+
+  const handleAssign = async (assigneeId: string | null) => {
+    setOpen(false);
+    setLoading(true);
+    // Optimistic update
+    const prevAssignee = currentAssignee;
+    updateTask(taskId, { assignee_id: assigneeId });
+    try {
+      await updateTaskAssignee(taskId, assigneeId);
+    } catch {
+      // Rollback on failure
+      updateTask(taskId, { assignee_id: prevAssignee });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const assignedMember = members.find((m) => m.user_id === currentAssignee);
+  const initial = assignedMember
+    ? (assignedMember.display_name ?? assignedMember.email ?? assignedMember.user_id).charAt(0).toUpperCase()
+    : null;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        disabled={loading}
+        className="flex items-center gap-1 text-[10px] font-mono text-text-dim hover:text-text-muted transition-colors"
+        title={assignedMember ? `Assigned to ${assignedMember.display_name ?? assignedMember.email ?? assignedMember.user_id}` : "Unassigned — click to assign"}
+      >
+        {loading ? (
+          <span className="size-3 border border-white/20 border-t-primary rounded-full animate-spin" />
+        ) : initial ? (
+          <span className="size-5 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-[9px] text-primary font-semibold">{initial}</span>
+        ) : (
+          <span className="material-symbols-outlined text-[14px]">person_add</span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-6 z-30 w-40 bg-[#1a1a1e] border border-white/10 rounded-sm shadow-xl shadow-black/40 overflow-hidden">
+          <button
+            onClick={() => handleAssign(null)}
+            className={`w-full px-3 py-2 text-left text-[11px] font-mono hover:bg-white/5 transition-colors ${!currentAssignee ? "text-primary" : "text-text-muted"}`}
+          >
+            Unassigned
+          </button>
+          {members.map((m) => (
+            <button
+              key={m.user_id}
+              onClick={() => handleAssign(m.user_id)}
+              className={`w-full px-3 py-2 text-left text-[11px] font-mono hover:bg-white/5 transition-colors truncate ${m.user_id === currentAssignee ? "text-primary" : "text-text-muted"}`}
+            >
+              {m.display_name ?? m.email ?? m.user_id.slice(0, 8)}
+            </button>
+          ))}
+          {members.length === 0 && (
+            <p className="px-3 py-2 text-[10px] text-text-dim">No members loaded</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Task Card ────────────────────────────────────────────────────────────────
-const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
+const TaskCard: React.FC<{ task: Task; members: ProjectMember[] }> = ({ task, members }) => {
   const isDone = task.status === "done";
   const isConflict = task.hasConflict;
   const isReadyToMerge =
@@ -88,6 +162,11 @@ const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
             </div>
           )}
 
+          {/* Assignee */}
+          <div className="ml-auto">
+            <AssigneeDropdown taskId={task.id} currentAssignee={task.assignee_id} members={members} />
+          </div>
+
           {/* Review info */}
           {task.status === "in_progress" && task.prNumber && (
             <div className="flex items-center justify-between w-full">
@@ -119,10 +198,11 @@ const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
 };
 
 // ── Kanban Column ────────────────────────────────────────────────────────────
-const KanbanColumn: React.FC<{ status: TaskStatus; label: string; tasks: Task[] }> = ({
+const KanbanColumn: React.FC<{ status: TaskStatus; label: string; tasks: Task[]; members: ProjectMember[] }> = ({
   status,
   label,
   tasks,
+  members,
 }) => {
   const [showInput, setShowInput] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -165,7 +245,7 @@ const KanbanColumn: React.FC<{ status: TaskStatus; label: string; tasks: Task[] 
 
       {/* Cards */}
       {tasks.map((task) => (
-        <TaskCard key={task.id} task={task} />
+        <TaskCard key={task.id} task={task} members={members} />
       ))}
 
       {/* Add Task */}
@@ -218,6 +298,7 @@ const KanbanColumn: React.FC<{ status: TaskStatus; label: string; tasks: Task[] 
 const TaskBoard: React.FC = () => {
   const tasks = useStore((s) => s.tasks);
   const tasksLoading = useStore((s) => s.tasksLoading);
+  const members = useStore((s) => s.members);
   const safeTasks = Array.isArray(tasks) ? tasks : [];
 
   const getTasksByStatus = (status: TaskStatus) =>
@@ -268,6 +349,7 @@ const TaskBoard: React.FC = () => {
                 status={status}
                 label={label}
                 tasks={getTasksByStatus(status)}
+                members={members}
               />
             ))}
           </div>

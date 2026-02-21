@@ -8,7 +8,16 @@ import type {
   User,
   DashboardMetrics,
   AgentMessage,
+  ProjectMember,
 } from "../types";
+
+// ── Toast system ──────────────────────────────────────────────────────────────
+export interface Toast {
+  id: string;
+  type: "success" | "error" | "info";
+  message: string;
+  link?: { label: string; url: string };
+}
 
 // ── App State ─────────────────────────────────────────────────────────────────
 interface AppState {
@@ -22,6 +31,10 @@ interface AppState {
   project: Project | null;
   setProject: (project: Project) => void;
 
+  // Members
+  members: ProjectMember[];
+  setMembers: (members: ProjectMember[]) => void;
+
   // Tasks
   tasks: Task[];
   tasksLoading: boolean;
@@ -34,8 +47,14 @@ interface AppState {
 
   // Chat
   messages: Message[];
+  messagesLoading: boolean;
+  setMessagesLoading: (loading: boolean) => void;
   setMessages: (messages: Message[]) => void;
   addMessage: (message: Message) => void;
+  updateMessage: (id: string, updates: Partial<Message>) => void;
+  removeMessage: (id: string) => void;
+  unreadCount: number;
+  setUnreadCount: (count: number) => void;
 
   // Presence
   presenceMap: Record<string, Presence>;
@@ -48,6 +67,11 @@ interface AppState {
   // Agent
   agentMessages: AgentMessage[];
   addAgentMessage: (msg: AgentMessage) => void;
+
+  // Toasts
+  toasts: Toast[];
+  addToast: (toast: Toast) => void;
+  removeToast: (id: string) => void;
 
   // UI
   activePanel: "dashboard" | "tasks" | "agent" | "terminal";
@@ -70,6 +94,10 @@ export const useStore = create<AppState>((set) => ({
   project: null,
   setProject: (project) => set({ project }),
 
+  // Members
+  members: [],
+  setMembers: (members) => set({ members: Array.isArray(members) ? members : [] }),
+
   // Tasks
   tasks: [],
   tasksLoading: true,
@@ -90,9 +118,23 @@ export const useStore = create<AppState>((set) => ({
 
   // Chat
   messages: [],
-  setMessages: (messages) => set({ messages: Array.isArray(messages) ? messages : [] }),
+  messagesLoading: true,
+  setMessagesLoading: (loading) => set({ messagesLoading: loading }),
+  setMessages: (messages) => set({ messages: Array.isArray(messages) ? messages : [], messagesLoading: false }),
   addMessage: (message) =>
-    set((s) => ({ messages: [...s.messages, message] })),
+    set((s) => {
+      // Avoid duplicates by id
+      if (s.messages.some((m) => m.id === message.id)) return s;
+      return { messages: [...s.messages, message] };
+    }),
+  updateMessage: (id, updates) =>
+    set((s) => ({
+      messages: s.messages.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+    })),
+  removeMessage: (id) =>
+    set((s) => ({ messages: s.messages.filter((m) => m.id !== id) })),
+  unreadCount: 0,
+  setUnreadCount: (count) => set({ unreadCount: count }),
 
   // Presence
   presenceMap: {},
@@ -115,6 +157,13 @@ export const useStore = create<AppState>((set) => ({
   addAgentMessage: (msg) =>
     set((s) => ({ agentMessages: [...s.agentMessages, msg] })),
 
+  // Toasts
+  toasts: [],
+  addToast: (toast) =>
+    set((s) => ({ toasts: [...s.toasts, toast] })),
+  removeToast: (id) =>
+    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+
   // UI
   activePanel: "dashboard",
   setActivePanel: (panel) => set({ activePanel: panel }),
@@ -126,11 +175,15 @@ export const useStore = create<AppState>((set) => ({
     set({
       currentUser: null,
       project: null,
+      members: [],
       tasks: [],
       tasksLoading: true,
       messages: [],
+      messagesLoading: true,
+      unreadCount: 0,
       presenceMap: {},
       agentMessages: [],
+      toasts: [],
       activePanel: "dashboard",
       sessionExpired: false,
       metrics: {

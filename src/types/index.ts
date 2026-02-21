@@ -21,6 +21,19 @@ export interface Task {
   updated_at: string;
 }
 
+// ── Project Member ───────────────────────────────────────────────────────────
+export type ProjectMemberRole = "owner" | "member";
+
+export interface ProjectMember {
+  id: string;
+  project_id: string;
+  user_id: string;
+  role: ProjectMemberRole;
+  display_name?: string;
+  email?: string;
+  created_at: string;
+}
+
 // ── User ──────────────────────────────────────────────────────────────────────
 export interface User {
   uid: string;
@@ -40,6 +53,8 @@ export interface Presence {
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
+export type MessageStatus = "sending" | "sent" | "failed";
+
 export interface Message {
   id: string;
   project_id: string;
@@ -48,6 +63,8 @@ export interface Message {
   sender_kind?: "user" | "assistant";
   sender_label?: string | null;
   created_at: string;
+  /** Frontend-only: tracks send state for optimistic messages */
+  _status?: MessageStatus;
 }
 
 // ── Project ──────────────────────────────────────────────────────────────────
