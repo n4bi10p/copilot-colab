@@ -1,18 +1,117 @@
 {
   "name": "copilot-colab-backend",
+  "displayName": "Copilot CoLab",
   "version": "0.1.0",
   "private": true,
-  "description": "Backend integration layer for Copilot CoLab Supabase.",
+  "publisher": "n4bi10p",
+  "description": "VS Code extension for Copilot CoLab collaboration with Supabase backend.",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onView:copilot-colab.mainView",
+    "onCommand:copilot-colab.openDashboard",
+    "onCommand:copilotColab.project.create",
+    "onCommand:copilotColab.member.invite",
+    "onCommand:copilotColab.member.remove",
+    "onCommand:copilotColab.member.list",
+    "onCommand:copilotColab.tasks.list",
+    "onCommand:copilotColab.messages.list",
+    "onCommand:copilotColab.presence.upsert",
+    "onCommand:copilotColab.realtime.subscribeProject",
+    "onCommand:copilotColab.realtime.unsubscribeProject"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "copilot-colab.openDashboard",
+        "title": "Copilot CoLab: Open Dashboard"
+      },
+      {
+        "command": "copilotColab.project.create",
+        "title": "Copilot CoLab: Create Project"
+      },
+      {
+        "command": "copilotColab.member.invite",
+        "title": "Copilot CoLab: Invite Member"
+      },
+      {
+        "command": "copilotColab.member.remove",
+        "title": "Copilot CoLab: Remove Member"
+      },
+      {
+        "command": "copilotColab.member.list",
+        "title": "Copilot CoLab: List Members"
+      },
+      {
+        "command": "copilotColab.tasks.list",
+        "title": "Copilot CoLab: List Tasks"
+      },
+      {
+        "command": "copilotColab.messages.list",
+        "title": "Copilot CoLab: List Messages"
+      },
+      {
+        "command": "copilotColab.presence.upsert",
+        "title": "Copilot CoLab: Upsert Presence"
+      },
+      {
+        "command": "copilotColab.realtime.subscribeProject",
+        "title": "Copilot CoLab: Subscribe Realtime"
+      },
+      {
+        "command": "copilotColab.realtime.unsubscribeProject",
+        "title": "Copilot CoLab: Unsubscribe Realtime"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "copilot-colab",
+          "title": "Copilot CoLab",
+          "icon": "media/copilot-colab.svg"
+        }
+      ]
+    },
+    "views": {
+      "copilot-colab": [
+        {
+          "id": "copilot-colab.mainView",
+          "name": "Main View",
+          "type": "webview"
+        }
+      ]
+    }
+  },
   "scripts": {
+    "dev": "webpack --config webpack.config.js --watch --mode none",
+    "compile:extension": "webpack --config webpack.config.js --mode none",
     "typecheck": "tsc --noEmit -p tsconfig.backend.json",
     "typecheck:all": "tsc --noEmit -p tsconfig.json",
-    "build": "tsc -p tsconfig.json"
+    "build": "webpack --config webpack.config.js --mode production"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4"
+    "@supabase/supabase-js": "^2.57.4",
+    "process": "^0.11.10",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@types/node": "^24.4.0",
-    "typescript": "^5.9.2"
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@types/vscode": "^1.90.0",
+    "autoprefixer": "^10.4.21",
+    "css-loader": "^7.1.2",
+    "mini-css-extract-plugin": "^2.9.4",
+    "postcss": "^8.5.6",
+    "postcss-loader": "^8.2.0",
+    "tailwindcss": "^3.4.17",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.2",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1"
   }
 }
