@@ -52,6 +52,14 @@ This file maps extension-side API wrappers to `supabase/contracts.md`.
     - `GITHUB_TOKEN` (optional, for GitHub context)
     - `GITHUB_REPOSITORY` (optional fallback if workspace git remote cannot be detected, e.g. `n4bi10p/copilot-colab`)
 
+## Copilot SDK wrapper (`src/extension/api/copilot.ts`)
+
+- `suggestFromSelection({ prompt, model, cliUrl? })`
+  - provider: GitHub Copilot SDK
+  - env:
+    - `COPILOT_MODEL` (optional default, e.g. `gpt-4.1`)
+    - `COPILOT_CLI_URL` (optional external headless server URL, e.g. `http://localhost:4321`)
+
 ## Realtime wrappers (`src/extension/api/realtime.ts`)
 
 - `subscribeTasksByProject(projectId, handler)`
@@ -147,6 +155,12 @@ await vscode.commands.executeCommand("copilotColab.ai.generateWbs", {
   maxTasks: 10,
   persist: true,
 });
+
+// Copilot SDK suggestion from active editor selection
+await vscode.commands.executeCommand("copilotColab.ai.suggestFromSelection", {
+  prompt: "Refactor this code for readability and list concrete edits.",
+  model: "gpt-4.1",
+});
 ```
 
 ## Webview Bridge Contract
@@ -186,3 +200,4 @@ Suggested frontend helper:
   - `backendClient.signUpWithPassword(email, password)`
   - `backendClient.signOut()`
   - `backendClient.generateWbs({ projectId, goal, ... })`
+  - `backendClient.suggestFromSelection({ prompt, model? })`
