@@ -39,6 +39,15 @@ export const BACKEND_COMMANDS = {
 } as const;
 
 export class BackendClient {
+    generateWbs<T = unknown>(args: {
+      projectId: string;
+      goal: string;
+      constraints?: string[];
+      maxTasks?: number;
+      persist?: boolean;
+    }): Promise<T> {
+      return this.execute<T>("copilotColab.ai.generateWbs", args, 20000);
+    }
   private readonly vscode =
     typeof acquireVsCodeApi === "function" ? acquireVsCodeApi() : null;
   private readonly pending = new Map<string, PendingRequest>();
