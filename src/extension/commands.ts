@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { CopilotColabAiApi } from "./api/ai";
 import { CopilotColabAuthApi } from "./api/auth";
+import { CopilotColabGithubApi } from "./api/github";
 import { CopilotColabRealtimeApi } from "./api/realtime";
 import { CopilotColabSupabaseApi } from "./api/supabase";
 import type { PresenceStatus, ProjectMemberRole } from "../types/backend";
@@ -19,6 +21,7 @@ export const COMMANDS = {
   authSignInPassword: "copilotColab.auth.signInWithPassword",
   authSignUpPassword: "copilotColab.auth.signUpWithPassword",
   authSignOut: "copilotColab.auth.signOut",
+  aiGenerateWbs: "copilotColab.ai.generateWbs",
   createProject: "copilotColab.project.create",
   inviteMember: "copilotColab.member.invite",
   removeMember: "copilotColab.member.remove",
@@ -31,7 +34,9 @@ export const COMMANDS = {
 } as const;
 
 interface CommandDeps {
+  aiApi: CopilotColabAiApi;
   authApi: CopilotColabAuthApi;
+  githubApi: CopilotColabGithubApi;
   api: CopilotColabSupabaseApi;
   realtimeApi: CopilotColabRealtimeApi;
   output: vscode.OutputChannel;
@@ -72,6 +77,14 @@ interface PasswordAuthArgs {
   password: string;
 }
 
+interface GenerateWbsArgs {
+  projectId: string;
+  goal: string;
+  constraints?: string[];
+  maxTasks?: number;
+  persist?: boolean;
+}
+
 type CommandSuccess = { ok: true; data: unknown };
 type CommandFailure = { ok: false; error: string };
 type CommandResult = CommandSuccess | CommandFailure;
@@ -85,7 +98,7 @@ function fail(error: unknown): CommandFailure {
 }
 
 export function registerBackendCommands(context: vscode.ExtensionContext, deps: CommandDeps): void {
-  const { authApi, api, realtimeApi, output } = deps;
+  const { aiApi, authApi, githubApi, api, realtimeApi, output } = deps;
   const subscriptions = new Map<string, RealtimeChannel[]>();
 
   const register = (command: string, handler: (...args: any[]) => Promise<CommandResult>) => {
@@ -132,6 +145,52 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
     await authApi.signOut();
     output.appendLine(`[${COMMANDS.authSignOut}] done`);
     return ok({ signedOut: true });
+  });
+
+  register(COMMANDS.aiGenerateWbs, async (args: GenerateWbsArgs) => {
+    const [existingTasks, recentMessages, members] = await Promise.all([
+      api.listTasksByProject(args.projectId),
+      api.listMessagesByProject(args.projectId, 20),
+      api.listProjectMembers(args.projectId),
+    ]);
+    const github = await githubApi.getRecentContext();
+
+    const suggestion = await aiApi.generateWbs({
+      projectId: args.projectId,
+      goal: args.goal,
+      constraints: args.constraints,
+      maxTasks: args.maxTasks,
+      existingTasks,
+      recentMessages,
+      memberCount: members.length,
+      github,
+    });
+
+    let persistedCount = 0;
+    if (args.persist) {
+      const created = await api.createTasks(
+        suggestion.tasks.map((task) => ({
+          project_id: args.projectId,
+          title: task.title,
+          status: task.status,
+          assignee_id: null,
+        }))
+      );
+      persistedCount = created.length;
+    }
+
+    output.appendLine(
+      `[${COMMANDS.aiGenerateWbs}] project=${args.projectId} generated=${suggestion.tasks.length} persisted=${persistedCount}`
+    );
+
+    return ok({
+      projectId: args.projectId,
+      goal: args.goal,
+      model: suggestion.model,
+      generated: suggestion.tasks,
+      notes: suggestion.notes,
+      persistedCount,
+    });
   });
 
   register(COMMANDS.createProject, async (args: CreateProjectArgs) => {

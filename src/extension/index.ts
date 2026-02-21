@@ -1,11 +1,16 @@
 import * as vscode from "vscode";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { createClient } from "@supabase/supabase-js";
+import { CopilotColabAiApi } from "./api/ai";
 import { CopilotColabAuthApi } from "./api/auth";
+import { CopilotColabGithubApi } from "./api/github";
 import { CopilotColabRealtimeApi } from "./api/realtime";
 import { CopilotColabSupabaseApi } from "./api/supabase";
 import { registerBackendCommands, registerCommands } from "./commands";
 
 const OUTPUT_CHANNEL = "Copilot CoLab Backend";
+const execFileAsync = promisify(execFile);
 
 let panel: vscode.WebviewPanel | undefined;
 
@@ -21,6 +26,41 @@ function getSupabaseConfig(): { url: string; anonKey: string } | null {
     return null;
   }
   return { url, anonKey };
+}
+
+function parseGithubRepository(remoteUrl: string): string | null {
+  const trimmed = remoteUrl.trim();
+
+  const sshMatch = trimmed.match(/^git@github\.com:([^/]+)\/(.+?)(?:\.git)?$/i);
+  if (sshMatch) {
+    return `${sshMatch[1]}/${sshMatch[2]}`;
+  }
+
+  const httpsMatch = trimmed.match(/^https?:\/\/github\.com\/([^/]+)\/(.+?)(?:\.git)?$/i);
+  if (httpsMatch) {
+    return `${httpsMatch[1]}/${httpsMatch[2]}`;
+  }
+
+  const sshUrlMatch = trimmed.match(/^ssh:\/\/git@github\.com\/([^/]+)\/(.+?)(?:\.git)?$/i);
+  if (sshUrlMatch) {
+    return `${sshUrlMatch[1]}/${sshUrlMatch[2]}`;
+  }
+
+  return null;
+}
+
+async function detectWorkspaceGithubRepository(): Promise<string | null> {
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  if (!folder) {
+    return null;
+  }
+
+  try {
+    const { stdout } = await execFileAsync("git", ["-C", folder.uri.fsPath, "remote", "get-url", "origin"]);
+    return parseGithubRepository(stdout);
+  } catch {
+    return null;
+  }
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -44,10 +84,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   const client = createClient(config.url, config.anonKey);
+  const aiApi = new CopilotColabAiApi({
+    apiKey: readEnv("GEMINI_API_KEY"),
+    model: readEnv("GEMINI_MODEL"),
+  });
   const authApi = new CopilotColabAuthApi(client);
+  const detectedRepository = await detectWorkspaceGithubRepository();
+  const envRepository = readEnv("GITHUB_REPOSITORY");
+  const githubApi = new CopilotColabGithubApi({
+    token: readEnv("GITHUB_TOKEN"),
+    repository: detectedRepository ?? envRepository,
+  });
+  if (detectedRepository) {
+    output.appendLine(`GitHub repository detected from workspace: ${detectedRepository}`);
+  } else if (envRepository) {
+    output.appendLine(`GitHub repository loaded from env: ${envRepository}`);
+  } else {
+    output.appendLine("GitHub repository not detected. Set GITHUB_REPOSITORY for GitHub context.");
+  }
   const api = new CopilotColabSupabaseApi(client);
   const realtimeApi = new CopilotColabRealtimeApi(client);
-  registerBackendCommands(context, { authApi, api, realtimeApi, output });
+  registerBackendCommands(context, { aiApi, authApi, githubApi, api, realtimeApi, output });
   output.appendLine("Copilot CoLab backend commands registered.");
 }
 

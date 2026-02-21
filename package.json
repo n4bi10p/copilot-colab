@@ -17,6 +17,7 @@
     "onCommand:copilotColab.auth.signInWithPassword",
     "onCommand:copilotColab.auth.signUpWithPassword",
     "onCommand:copilotColab.auth.signOut",
+    "onCommand:copilotColab.ai.generateWbs",
     "onCommand:copilotColab.project.create",
     "onCommand:copilotColab.member.invite",
     "onCommand:copilotColab.member.remove",
@@ -52,6 +53,10 @@
       {
         "command": "copilotColab.auth.signOut",
         "title": "Copilot CoLab: Auth Sign Out"
+      },
+      {
+        "command": "copilotColab.ai.generateWbs",
+        "title": "Copilot CoLab: AI Generate WBS"
       },
       {
         "command": "copilotColab.project.create",

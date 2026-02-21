@@ -24,6 +24,7 @@ export const BACKEND_COMMANDS = {
   authSignInPassword: "copilotColab.auth.signInWithPassword",
   authSignUpPassword: "copilotColab.auth.signUpWithPassword",
   authSignOut: "copilotColab.auth.signOut",
+  aiGenerateWbs: "copilotColab.ai.generateWbs",
   createProject: "copilotColab.project.create",
   inviteMember: "copilotColab.member.invite",
   removeMember: "copilotColab.member.remove",
@@ -111,6 +112,16 @@ export class BackendClient {
 
   signOut<T = unknown>(): Promise<T> {
     return this.execute<T>(BACKEND_COMMANDS.authSignOut);
+  }
+
+  generateWbs<T = unknown>(args: {
+    projectId: string;
+    goal: string;
+    constraints?: string[];
+    maxTasks?: number;
+    persist?: boolean;
+  }): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.aiGenerateWbs, args, 20_000);
   }
 
   private makeRequestId(): string {
