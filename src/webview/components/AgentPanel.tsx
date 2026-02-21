@@ -4,7 +4,7 @@ import { useStore } from "../../state/store";
 import AuthWidget from "./AuthWidget";
 import AICommandPanel from './AICommandPanel';
 import { backendClient } from "../utils/backendClient";
-import type { AgentMessage, TerminalLine } from "../../types/index";
+import type { AgentMessage } from "../../types/index";
 
 const AgentPanel: React.FC = () => {
   // Chat state
@@ -96,51 +96,55 @@ const AgentPanel: React.FC = () => {
       return;
     }
 
-    // Default: Simulate agent response
-    setTimeout(() => {
+    // Default: send to AI assistant
+    try {
+      const result = await backendClient.suggestFromSelection<{ content: string }>({ prompt: text });
       addAgentMessage({
         id: `agent-${Date.now()}`,
         role: "agent",
-        content: `Echo: ${text}`,
+        content: result.content || "(No response from AI)",
         timestamp: Date.now(),
       });
+    } catch (err: any) {
+      setSendError(err?.message || "Failed to get AI response.");
+      addAgentMessage({
+        id: `agent-err-${Date.now()}`,
+        role: "agent",
+        content: "Sorry, the AI could not process your request.",
+        timestamp: Date.now(),
+      });
+    } finally {
       setSending(false);
-    }, 800);
+    }
   }, [inputValue, addAgentMessage]);
 
-  // Handle agent action chips
-  const handleActionClick = useCallback((action: string) => {
+  // Handle agent action chips — call AI with context
+  const handleActionClick = useCallback(async (action: string) => {
     addAgentMessage({
       id: `user-${Date.now()}`,
       role: "user",
       content: `[${action}]`,
       timestamp: Date.now(),
     });
-    setTimeout(() => {
+    try {
+      const result = await backendClient.suggestFromSelection<{ content: string }>({
+        prompt: action,
+      });
       addAgentMessage({
         id: `agent-${Date.now()}`,
         role: "agent",
-        content:
-          action === "Run Analysis"
-            ? "Running predictive analysis on affected lines in payment-api.ts...\n\nFound 3 conflicting sections. Generating diff..."
-            : action === "Diff Check"
-            ? "Fetching latest diff from origin/main. Comparing 142 lines..."
-            : "Conflict warning dismissed. I'll re-check on next sync.",
+        content: result.content || "(No response)",
         timestamp: Date.now(),
       });
-    }, 800);
+    } catch (err: any) {
+      addAgentMessage({
+        id: `agent-err-${Date.now()}`,
+        role: "agent",
+        content: `Error: ${err?.message ?? "AI request failed"}`,
+        timestamp: Date.now(),
+      });
+    }
   }, [addAgentMessage]);
-
-  // Terminal lines mock
-  const TERMINAL_LINES: TerminalLine[] = [
-    { type: "command", text: "scanning dependency tree..." },
-    { type: "output", text: "  > analyzing src/api/payments/..." },
-    { type: "output", text: "  > parsing AST..." },
-    { type: "success", text: "✔ No circular refs found." },
-    { type: "command", text: "checking typings..." },
-    { type: "warning", text: "⚠ Warning: 'TransactionType' is deprecated." },
-    { type: "cursor", text: "" },
-  ];
 
   // Unread marker component
   const UnreadMarker: React.FC<{ count: number; onClick: () => void }> = ({ count, onClick }) => (
@@ -194,17 +198,7 @@ const AgentPanel: React.FC = () => {
                 <div className="flex flex-col gap-2">
                   {msg.content.split("\n\n").map((para, i) => (
                     <p key={i} className="text-sm text-text-main leading-relaxed">
-                      {para.includes("payment-api.ts") ? (
-                        <>
-                          {para.split("payment-api.ts")[0]}
-                          <span className="font-mono text-accent-warm bg-accent-warm/10 px-1 py-0.5 rounded-sm">
-                            payment-api.ts
-                          </span>
-                          {para.split("payment-api.ts")[1]}
-                        </>
-                      ) : (
-                        para
-                      )}
+                      {para}
                     </p>
                   ))}
                 </div>
@@ -227,49 +221,7 @@ const AgentPanel: React.FC = () => {
             </div>
           ))}
 
-          <div className="w-full h-px bg-border-dark my-2" />
-
-          {/* Terminal Output */}
-          <div className="flex flex-col gap-2 bg-surface-dark border border-white/5 p-4 rounded-sm font-mono text-[11px] h-48 overflow-y-auto font-light shrink-0">
-            <div className="flex justify-between text-text-dim border-b border-white/5 pb-2 mb-2">
-              <span>TERMINAL OUTPUT</span>
-              <span>bash</span>
-            </div>
-            {TERMINAL_LINES.map((line, i) => {
-              if (line.type === "cursor") {
-                return (
-                  <div key={i} className="flex items-center gap-1 mt-1">
-                    <span className="text-blue-500">➜</span>
-                    <span className="w-2 h-4 bg-text-muted animate-pulse" />
-                  </div>
-                );
-              }
-              return (
-                <p
-                  key={i}
-                  className={
-                    line.type === "command"
-                      ? "text-text-muted"
-                      : line.type === "success"
-                      ? "text-emerald-500/80"
-                      : line.type === "warning"
-                      ? "text-yellow-500/80"
-                      : line.type === "error"
-                      ? "text-red-500/80"
-                      : "text-text-dim"
-                  }
-                >
-                  {line.type === "command" && (
-                    <>
-                      <span className="text-blue-500">➜ </span>
-                      <span className="text-cyan-500">~ </span>
-                    </>
-                  )}
-                  {line.text}
-                </p>
-              );
-            })}
-          </div>
+          <div ref={bottomRef} />
         </div>
       </div>
 

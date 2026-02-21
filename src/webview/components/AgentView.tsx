@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useStore } from "../../state/store";
+import { backendClient } from "../utils/backendClient";
 import type { AgentMessage } from "../../types";
 
 const SLASH_COMMANDS = [
@@ -81,6 +82,7 @@ const AgentBubble: React.FC<{ msg: AgentMessage }> = ({ msg }) => {
 
 const AgentView: React.FC = () => {
   const { agentMessages, addAgentMessage } = useStore();
+  const project = useStore((s) => s.project);
   const [input, setInput] = useState("");
   const [showCommands, setShowCommands] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -95,7 +97,7 @@ const AgentView: React.FC = () => {
     setShowCommands(val.startsWith("/") && val.length >= 1);
   };
 
-  const sendMessage = (text: string) => {
+  const sendMessage = async (text: string) => {
     if (!text.trim()) return;
     addAgentMessage({
       id: `user-${Date.now()}`,
@@ -107,29 +109,67 @@ const AgentView: React.FC = () => {
     setShowCommands(false);
     setIsTyping(true);
 
-    setTimeout(() => {
-      setIsTyping(false);
+    try {
+      let content = "";
+      let actions: string[] | undefined;
+
+      if (/^\/wbs/i.test(text.trim()) || /\bwbs\b/i.test(text)) {
+        const goal = text.replace(/^\/wbs\s*/i, "").trim() || "the current project";
+        if (!project?.id) {
+          content = "No project selected. Please set up a project first.";
+        } else {
+          const result = await backendClient.generateWbs<{
+            generated: Array<{ title: string; description?: string }>;
+            model: string;
+          }>({ projectId: project.id, goal });
+          const taskLines = result.generated
+            .slice(0, 10)
+            .map((t, i) => `${i + 1}. ${t.title}`)
+            .join("\n");
+          content = `**WBS generated (${result.model}):**\n\n${taskLines}\n\nWould you like to save these tasks to the board?`;
+          actions = ["Open Task Board", "Dismiss"];
+        }
+      } else if (/^\/assign/i.test(text.trim()) || /\bassign\b/i.test(text)) {
+        if (!project?.id) {
+          content = "No project selected. Please set up a project first.";
+        } else {
+          const result = await backendClient.aiAssignTasks<{
+            assignments: Array<{ taskId: string; assigneeId: string; reason: string }>;
+            usedFallback: boolean;
+          }>(project.id);
+          const count = result.assignments.length;
+          const fallbackNote = result.usedFallback
+            ? "\n\n_Used round-robin fallback (AI returned no valid mapping)._"
+            : "";
+          content = `Proposed **${count}** task assignment${count !== 1 ? "s" : ""}.${fallbackNote}\n\nUse the Task Board's "Assign via Gemini" button to persist.`;
+          actions = ["Open Task Board", "Dismiss"];
+        }
+      } else {
+        // General AI prompt → suggestFromSelection
+        const cleanPrompt = text.replace(/^\/\w+\s*/, "").trim() || text;
+        const result = await backendClient.suggestFromSelection<{ content: string; model: string }>({
+          prompt: cleanPrompt,
+        });
+        content = result.content || "(No response from AI)";
+      }
+
       addAgentMessage({
         id: `agent-${Date.now()}`,
         role: "agent",
-        content: getAgentResponse(text),
+        content,
         timestamp: Date.now(),
-        actions:
-          text.toLowerCase().includes("wbs") ? ["Accept All", "Edit Tasks", "Dismiss"] :
-          text.toLowerCase().includes("digest") ? ["Send to Team", "Copy", "Dismiss"] :
-          undefined,
+        actions,
       });
-    }, 1200);
-  };
-
-  const getAgentResponse = (text: string): string => {
-    if (text.includes("/wbs") || text.toLowerCase().includes("wbs")) {
-      return "Generating Work Breakdown Structure...\n\n**Authentication Module WBS:**\n- `AUTH-001` Setup Firebase Auth provider\n- `AUTH-002` Implement Google OAuth flow\n- `AUTH-003` GitHub OAuth integration\n- `AUTH-004` Session management + token refresh\n- `AUTH-005` Auth guard middleware\n\nShall I add these directly to the task board?";
+    } catch (err: any) {
+      addAgentMessage({
+        id: `agent-err-${Date.now()}`,
+        role: "agent",
+        content: `Error: ${err?.message ?? "AI request failed"}`,
+        timestamp: Date.now(),
+      });
+    } finally {
+      setIsTyping(false);
     }
-    if (text.includes("/digest") || text.toLowerCase().includes("digest")) {
-      return "**Daily Digest — Feb 21, 2026**\n\nTasks completed: 2 | In progress: 2 | Blocked: 1\n\nKey updates:\n- `NET-conflict` has a merge conflict with `origin/main` in `payment-api.ts`\n- `NET-review-1` is ready to merge (2/2 approvals)\n- Build time improved by 12% vs yesterday\n\nTeam is on track for Cycle 42 deadline.";
-    }
-    return "I've analyzed your request. Based on the current project state, I recommend prioritizing the `in-progress` tasks before picking up new backlog items. The payment API conflict should be resolved first as it blocks 2 downstream tasks.";
   };
 
   const filteredCommands = SLASH_COMMANDS.filter((c) =>
@@ -219,7 +259,7 @@ const AgentView: React.FC = () => {
               <input
                 value={input}
                 onChange={(e) => handleInputChange(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage(input)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !isTyping && void sendMessage(input)}
                 placeholder="Ask the orchestrator... (type / for commands)"
                 className="flex-1 bg-transparent text-sm font-mono text-text-main placeholder-text-dim outline-none"
               />
@@ -230,8 +270,8 @@ const AgentView: React.FC = () => {
               )}
             </div>
             <button
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim()}
+              onClick={() => void sendMessage(input)}
+              disabled={!input.trim() || isTyping}
               className="px-4 bg-primary text-white rounded-sm hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-[20px]">send</span>
@@ -252,7 +292,7 @@ const AgentView: React.FC = () => {
           {SUGGESTED_PROMPTS.map((prompt) => (
             <button
               key={prompt}
-              onClick={() => sendMessage(prompt)}
+              onClick={() => void sendMessage(prompt)}
               className="text-left px-4 py-3 bg-surface-dark border border-white/5 rounded-sm text-xs text-text-muted hover:text-white hover:border-white/10 transition-colors leading-relaxed"
             >
               {prompt}

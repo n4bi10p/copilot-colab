@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useStore } from "../../state/store";
+import { backendClient } from "../utils/backendClient";
 
 type LogLevel = "info" | "success" | "warning" | "error" | "command" | "dim";
 
@@ -9,43 +11,8 @@ interface LogEntry {
   time: string;
 }
 
-const TAB_LOGS: Record<string, LogEntry[]> = {
-  Build: [
-    { id: 1, level: "command", text: "webpack --mode production", time: "02:04:11" },
-    { id: 2, level: "dim", text: "  > compiling extension (node target)...", time: "02:04:11" },
-    { id: 3, level: "dim", text: "  > compiling webview (web target)...", time: "02:04:12" },
-    { id: 4, level: "dim", text: "  > running ts-loader on 22 files...", time: "02:04:14" },
-    { id: 5, level: "success", text: "✔ extension compiled successfully in 4141ms", time: "02:04:15" },
-    { id: 6, level: "success", text: "✔ webview compiled successfully in 7772ms", time: "02:04:19" },
-    { id: 7, level: "info", text: "  asset extension.js    3.74 KiB [minimized]", time: "02:04:19" },
-    { id: 8, level: "info", text: "  asset webview.js    159 KiB [minimized]", time: "02:04:19" },
-    { id: 9, level: "info", text: "  asset webview.css   26.8 KiB", time: "02:04:19" },
-    { id: 10, level: "success", text: "✔ Build complete. 0 errors, 0 warnings.", time: "02:04:19" },
-  ],
-  Sync: [
-    { id: 1, level: "command", text: "git fetch origin", time: "02:01:03" },
-    { id: 2, level: "info", text: "  From https://github.com/n4bi10p/copilot-colab", time: "02:01:04" },
-    { id: 3, level: "info", text: "  * [new branch]  feat/backend-firestore -> origin/feat/backend-firestore", time: "02:01:04" },
-    { id: 4, level: "command", text: "git rebase origin/main", time: "02:01:05" },
-    { id: 5, level: "success", text: "✔ Current branch feat/frontend-ui is up to date.", time: "02:01:05" },
-    { id: 6, level: "command", text: "git push -u origin feat/frontend-ui", time: "02:04:22" },
-    { id: 7, level: "dim", text: "  Counting objects: 32, done.", time: "02:04:22" },
-    { id: 8, level: "dim", text: "  Compressing objects: 100% (28/28), done.", time: "02:04:23" },
-    { id: 9, level: "success", text: "✔ Branch feat/frontend-ui pushed to origin.", time: "02:04:24" },
-  ],
-  "Agent Logs": [
-    { id: 1, level: "info", text: "[AGENT] Orchestrator initialized. Model: GPT-4", time: "02:00:00" },
-    { id: 2, level: "info", text: "[AGENT] Scanning workspace for conflicts...", time: "02:00:01" },
-    { id: 3, level: "dim", text: "  > Parsing AST for src/api/payments/...", time: "02:00:02" },
-    { id: 4, level: "dim", text: "  > Checking merge base with origin/main...", time: "02:00:03" },
-    { id: 5, level: "warning", text: "⚠ Conflict detected in payment-api.ts (lines 142–167)", time: "02:00:04" },
-    { id: 6, level: "info", text: "[AGENT] Conflict report generated. Notifying team...", time: "02:00:04" },
-    { id: 7, level: "warning", text: "⚠ 'TransactionType' is deprecated. Suggest migration.", time: "02:00:05" },
-    { id: 8, level: "success", text: "✔ No circular dependencies found.", time: "02:00:06" },
-    { id: 9, level: "info", text: "[AGENT] Presence sync: 3 users online.", time: "02:00:10" },
-    { id: 10, level: "info", text: "[AGENT] Listening for Firestore updates on demo-project...", time: "02:00:11" },
-  ],
-};
+const TABS = ["Backend", "Realtime", "Agent Logs"] as const;
+type TabName = typeof TABS[number];
 
 const LINE_COLORS: Record<LogLevel, string> = {
   command: "text-cyan-400",
@@ -57,15 +24,79 @@ const LINE_COLORS: Record<LogLevel, string> = {
 };
 
 const TerminalView: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>("Build");
+  const members = useStore((s) => s.members);
+  const project = useStore((s) => s.project);
+  const [activeTab, setActiveTab] = useState<string>("Backend");
   const [filter, setFilter] = useState("");
+  const [tabLines, setTabLines] = useState<Record<string, LogEntry[]>>({});
+  const [loading, setLoading] = useState(false);
   const [liveLines, setLiveLines] = useState<LogEntry[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(100);
 
-  const tabs = Object.keys(TAB_LOGS);
+  const now = () =>
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-  const baseLines = TAB_LOGS[activeTab] ?? [];
+  const makeEntry = (text: string, level: LogLevel, id?: number): LogEntry => ({
+    id: id ?? nextId.current++,
+    level,
+    text,
+    time: now(),
+  });
+
+  // Load real data per tab from backend commands
+  useEffect(() => {
+    if (tabLines[activeTab]) return; // already loaded
+    setLoading(true);
+
+    const load = async () => {
+      const entries: LogEntry[] = [];
+      try {
+        if (activeTab === "Backend") {
+          entries.push(makeEntry("copilotColab.backend.smokeTest", "command"));
+          const result = await backendClient.execute<Record<string, unknown>>(
+            "copilotColab.backend.smokeTest", {}
+          );
+          for (const [key, val] of Object.entries(result ?? {})) {
+            const ok = val === true || (typeof val === "object" && (val as any)?.ok);
+            entries.push(makeEntry(`  ${key}: ${JSON.stringify(val)}`, ok ? "success" : "warning"));
+          }
+          entries.push(makeEntry("✔ Backend smoke test complete.", "success"));
+        } else if (activeTab === "Realtime") {
+          entries.push(makeEntry("copilotColab.realtime.health", "command"));
+          const result = await backendClient.execute<Record<string, unknown>>(
+            "copilotColab.realtime.health", {}
+          );
+          for (const [key, val] of Object.entries(result ?? {})) {
+            entries.push(makeEntry(`  ${key}: ${JSON.stringify(val)}`, "info"));
+          }
+          entries.push(makeEntry("✔ Realtime health check complete.", "success"));
+        } else if (activeTab === "Agent Logs") {
+          entries.push(makeEntry("copilotColab.demo.healthcheck", "command"));
+          const result = await backendClient.execute<{ checks?: Record<string, unknown> }>(
+            "copilotColab.demo.healthcheck", { projectId: project?.id }
+          );
+          const checks = result?.checks ?? (result as any) ?? {};
+          for (const [key, val] of Object.entries(checks)) {
+            const ok = val === true || (typeof val === "object" && (val as any)?.ok);
+            entries.push(makeEntry(`  [${key}] ${JSON.stringify(val)}`, ok ? "success" : "warning"));
+          }
+          entries.push(makeEntry("✔ Demo healthcheck complete.", "success"));
+        }
+      } catch (err: any) {
+        entries.push(makeEntry(`✘ ${err?.message ?? "Command failed"}`, "error"));
+      }
+      setTabLines((prev) => ({ ...prev, [activeTab]: entries }));
+      setLoading(false);
+    };
+
+    void load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const tabs = [...TABS];
+
+  const baseLines = tabLines[activeTab] ?? [];
   const allLines = [...baseLines, ...liveLines];
   const filtered = allLines.filter((l) =>
     filter ? l.text.toLowerCase().includes(filter.toLowerCase()) : true
@@ -73,13 +104,15 @@ const TerminalView: React.FC = () => {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [filtered.length, activeTab]);
+  }, [filtered.length, activeTab, loading]);
 
-  const handleClear = () => setLiveLines([]);
+  const handleClear = () => {
+    setLiveLines([]);
+    setTabLines((prev) => ({ ...prev, [activeTab]: [] }));
+  };
 
   const appendLine = (text: string, level: LogLevel = "command") => {
-    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    setLiveLines((prev) => [...prev, { id: nextId.current++, level, text, time: now }]);
+    setLiveLines((prev) => [...prev, { id: nextId.current++, level, text, time: now() }]);
   };
 
   return (
@@ -99,6 +132,9 @@ const TerminalView: React.FC = () => {
               {tab}
               {tab === "Agent Logs" && (
                 <span className="ml-2 size-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+              )}
+              {loading && activeTab === tab && (
+                <span className="ml-2 size-1.5 rounded-full bg-yellow-400 inline-block animate-pulse" />
               )}
             </button>
           ))}
@@ -121,11 +157,27 @@ const TerminalView: React.FC = () => {
               <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
               Clear
             </button>
+            <button
+              onClick={() => setTabLines((prev) => ({ ...prev, [activeTab]: [] }))}
+              className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-mono text-text-dim hover:text-white transition-colors border border-transparent hover:border-white/10 rounded-sm"
+            >
+              <span className="material-symbols-outlined text-[14px]">refresh</span>
+              Reload
+            </button>
           </div>
         </div>
 
         {/* Terminal output */}
         <div className="flex-1 overflow-y-auto p-6 font-mono text-[12px] leading-relaxed">
+          {loading && (
+            <div className="flex items-center gap-2 px-2 py-1 text-text-dim">
+              <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+              Loading from backend...
+            </div>
+          )}
+          {!loading && filtered.length === 0 && (
+            <p className="text-text-dim px-2 py-1">No output yet. Run a command or switch tabs.</p>
+          )}
           {filtered.map((line) => (
             <div key={line.id} className="flex items-start gap-4 group hover:bg-white/[0.02] px-2 py-0.5 rounded-sm">
               <span className="text-text-dim shrink-0 select-none">{line.time}</span>
@@ -169,9 +221,9 @@ const TerminalView: React.FC = () => {
           {[
             { label: "Extension Host", status: "RUNNING", color: "text-emerald-400" },
             { label: "Webpack Watch", status: "IDLE", color: "text-text-muted" },
-            { label: "Firestore Sync", status: "CONNECTED", color: "text-emerald-400" },
+            { label: "Supabase Sync", status: "CONNECTED", color: "text-emerald-400" },
             { label: "AI Orchestrator", status: "ONLINE", color: "text-emerald-400" },
-            { label: "Presence", status: "3 ONLINE", color: "text-blue-400" },
+            { label: "Presence", status: `${members.length || 0} ONLINE`, color: "text-blue-400" },
           ].map(({ label, status, color }) => (
             <div key={label} className="flex items-center justify-between">
               <span className="text-xs font-mono text-text-muted">{label}</span>
