@@ -2,7 +2,6 @@
 const path = require("path");
 const webpack = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
-require("dotenv").config();
 
 /** @type {import('webpack').Configuration[]} */
 module.exports = [
@@ -23,7 +22,7 @@ module.exports = [
       rules: [
         {
           test: /\.ts$/,
-          use: [{ loader: "ts-loader", options: { configFile: "tsconfig.json" } }],
+          use: [{ loader: "ts-loader", options: { configFile: "tsconfig.extension.json" } }],
           exclude: /node_modules/,
         },
       ],
@@ -39,7 +38,12 @@ module.exports = [
       path: path.resolve(__dirname, "dist"),
       filename: "webview.js",
     },
-    resolve: { extensions: [".ts", ".tsx", ".js", ".jsx"] },
+    resolve: {
+      extensions: [".ts", ".tsx", ".js", ".jsx"],
+      fallback: {
+        process: require.resolve("process/browser"),
+      },
+    },
     module: {
       rules: [
         {
@@ -64,9 +68,11 @@ module.exports = [
     },
     plugins: [
       new MiniCssExtractPlugin({ filename: "webview.css" }),
+      new webpack.ProvidePlugin({
+        process: "process/browser",
+      }),
       new webpack.DefinePlugin({
-        __SUPABASE_URL__: JSON.stringify(process.env.SUPABASE_URL || ""),
-        __SUPABASE_ANON_KEY__: JSON.stringify(process.env.SUPABASE_ANON_KEY || ""),
+        "process.env.NODE_ENV": JSON.stringify("production"),
       }),
     ],
   },

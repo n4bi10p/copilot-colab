@@ -10,6 +10,7 @@ This folder contains local database migrations for Copilot CoLab.
 4. `20260221093000_presence_policy_fix_2.sql` (legacy no-op)
 5. `20260221100000_project_members_rls.sql`
 6. `20260221103000_fix_policy_recursion.sql`
+7. `20260221110000_membership_rpc.sql`
 
 ## Local apply/reset
 
