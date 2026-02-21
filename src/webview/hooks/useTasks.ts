@@ -1,71 +1,41 @@
-import { useEffect } from "react";
-import { getSupabaseClient } from "../lib/supabaseClient";
+import { useEffect, useRef } from "react";
 import { useStore } from "../../state/store";
+import { backendClient, BACKEND_COMMANDS } from "../utils/backendClient";
 import type { Task, TaskStatus } from "../../types";
 
-const PROJECT_ID = "demo-project";
+const POLL_INTERVAL_MS = 5_000;
 
-// ── Subscribe to real-time task changes ───────────────────────────────────────
+// Subscribe to tasks for the current project � polls every 5 s
 export function useTasksListener(): void {
-  const { setTasks, addTask, updateTask } = useStore();
+  const setTasks = useStore((s) => s.setTasks);
+  const project = useStore((s) => s.project);
+  const user = useStore((s) => s.currentUser);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const supabase = getSupabaseClient();
+    if (!project?.id || !user) return;
+    const projectId = project.id;
 
-    // Initial fetch
-    supabase
-      .from("tasks")
-      .select("*")
-      .eq("project_id", PROJECT_ID)
-      .order("updated_at", { ascending: false })
-      .then(({ data }) => {
-        if (data) setTasks(data as Task[]);
-      });
+    const fetchTasks = () => {
+      backendClient
+        .execute<Task[]>(BACKEND_COMMANDS.listTasks, { projectId })
+        .then((tasks) => setTasks(tasks ?? []))
+        .catch(() => { /* offline/preview mode */ });
+    };
 
-    // Realtime subscription
-    const channel = supabase
-      .channel(`tasks:project:${PROJECT_ID}`)
-      .on(
-        "postgres_changes" as any,
-        {
-          event: "*",
-          schema: "public",
-          table: "tasks",
-          filter: `project_id=eq.${PROJECT_ID}`,
-        } as any,
-        (payload: any) => {
-          if (payload.eventType === "INSERT") {
-            addTask(payload.new as Task);
-          } else if (payload.eventType === "UPDATE") {
-            updateTask(payload.new.id, payload.new as Partial<Task>);
-          }
-        }
-      )
-      .subscribe();
+    fetchTasks();
+    timerRef.current = setInterval(fetchTasks, POLL_INTERVAL_MS);
 
     return () => {
-      supabase.removeChannel(channel);
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, []);
+  }, [project?.id, user?.uid]);
 }
 
-// ── Create a new task ─────────────────────────────────────────────────────────
-export async function createTask(title: string, status: TaskStatus = "backlog"): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase.from("tasks").insert({
-    project_id: PROJECT_ID,
-    title,
-    status,
-  });
-  if (error) console.error("[CoLab] createTask error:", error.message);
+export async function createTask(projectId: string, title: string): Promise<void> {
+  await backendClient.execute(BACKEND_COMMANDS.createTask, { projectId, title });
 }
 
-// ── Update task status ────────────────────────────────────────────────────────
 export async function updateTaskStatus(id: string, status: TaskStatus): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase
-    .from("tasks")
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) console.error("[CoLab] updateTaskStatus error:", error.message);
+  await backendClient.execute(BACKEND_COMMANDS.updateTaskStatus, { id, status });
 }

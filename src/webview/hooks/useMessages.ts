@@ -1,58 +1,37 @@
-import { useEffect } from "react";
-import { getSupabaseClient } from "../lib/supabaseClient";
+import { useEffect, useRef } from "react";
 import { useStore } from "../../state/store";
+import { backendClient, BACKEND_COMMANDS } from "../utils/backendClient";
 import type { Message } from "../../types";
 
-const PROJECT_ID = "demo-project";
+const POLL_INTERVAL_MS = 5_000;
 
-// ── Subscribe to real-time messages ──────────────────────────────────────────
+// Subscribe to messages for the current project � polls every 5 s
 export function useMessagesListener(): void {
-  const { setMessages, addMessage } = useStore();
+  const setMessages = useStore((s) => s.setMessages);
+  const project = useStore((s) => s.project);
+  const user = useStore((s) => s.currentUser);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const supabase = getSupabaseClient();
+    if (!project?.id || !user) return;
+    const projectId = project.id;
 
-    // Initial fetch (last 50 messages)
-    supabase
-      .from("messages")
-      .select("*")
-      .eq("project_id", PROJECT_ID)
-      .order("created_at", { ascending: true })
-      .limit(50)
-      .then(({ data }) => {
-        if (data) setMessages(data as Message[]);
-      });
+    const fetchMessages = () => {
+      backendClient
+        .execute<Message[]>(BACKEND_COMMANDS.listMessages, { projectId })
+        .then((msgs) => setMessages(msgs ?? []))
+        .catch(() => { /* offline/preview mode */ });
+    };
 
-    // Realtime subscription
-    const channel = supabase
-      .channel(`messages:project:${PROJECT_ID}`)
-      .on(
-        "postgres_changes" as any,
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `project_id=eq.${PROJECT_ID}`,
-        } as any,
-        (payload: any) => {
-          addMessage(payload.new as Message);
-        }
-      )
-      .subscribe();
+    fetchMessages();
+    timerRef.current = setInterval(fetchMessages, POLL_INTERVAL_MS);
 
     return () => {
-      supabase.removeChannel(channel);
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, []);
+  }, [project?.id, user?.uid]);
 }
 
-// ── Send a message ────────────────────────────────────────────────────────────
-export async function sendMessage(text: string, authorId: string): Promise<void> {
-  const supabase = getSupabaseClient();
-  const { error } = await supabase.from("messages").insert({
-    project_id: PROJECT_ID,
-    text,
-    author_id: authorId,
-  });
-  if (error) console.error("[CoLab] sendMessage error:", error.message);
+export async function sendMessage(projectId: string, text: string, authorId: string): Promise<void> {
+  await backendClient.execute(BACKEND_COMMANDS.sendMessage, { projectId, text, authorId });
 }

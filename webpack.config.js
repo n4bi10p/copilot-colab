@@ -2,6 +2,7 @@
 const path = require("path");
 const webpack = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+require("dotenv").config();
 
 /** @type {import('webpack').Configuration[]} */
 module.exports = [
@@ -72,7 +73,9 @@ module.exports = [
         process: "process/browser",
       }),
       new webpack.DefinePlugin({
-        "process.env.NODE_ENV": JSON.stringify("production"),
+        "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "production"),
+        __SUPABASE_URL__: JSON.stringify(process.env.SUPABASE_URL || ""),
+        __SUPABASE_ANON_KEY__: JSON.stringify(process.env.SUPABASE_ANON_KEY || ""),
       }),
     ],
   },

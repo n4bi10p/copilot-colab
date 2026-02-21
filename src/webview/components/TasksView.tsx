@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useStore } from "../../state/store";
+import { updateTaskStatus } from "../hooks/useTasks";
 import type { Task, TaskStatus } from "../../types";
 
 const STATUSES: { value: TaskStatus | "all"; label: string; color: string }[] = [
@@ -172,7 +173,10 @@ const TaskDetail: React.FC<{ task: Task }> = ({ task }) => {
       {/* Move to next status */}
       {next && (
         <button
-          onClick={() => moveTask(task.id, next)}
+          onClick={() => {
+            moveTask(task.id, next);
+            updateTaskStatus(task.id, next).catch(() => {});
+          }}
           className="mt-auto w-full flex items-center justify-between p-4 bg-primary text-white rounded-sm hover:bg-primary/90 transition-colors group"
         >
           <span className="text-sm font-medium tracking-wide uppercase">Move to {next}</span>

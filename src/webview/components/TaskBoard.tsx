@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useStore } from "../../state/store";
+import { createTask } from "../hooks/useTasks";
 import type { Task, TaskStatus } from "../../types";
 
 const COLUMNS: { status: TaskStatus; label: string }[] = [
@@ -124,20 +125,25 @@ const KanbanColumn: React.FC<{ status: TaskStatus; label: string; tasks: Task[] 
 }) => {
   const [showInput, setShowInput] = useState(false);
   const [newTitle, setNewTitle] = useState("");
-  const { addTask } = useStore();
+  const project = useStore((s) => s.project);
+  const addTask = useStore((s) => s.addTask);
 
-  const handleAddTask = () => {
-    if (!newTitle.trim()) return;
+  const handleAddTask = async () => {
+    if (!newTitle.trim() || !project?.id) return;
+    const title = newTitle.trim();
+    // Optimistic store update
     addTask({
       id: `TASK-${Date.now()}`,
-      project_id: "demo-project",
-      title: newTitle.trim(),
+      project_id: project.id,
+      title,
       status,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
     setNewTitle("");
     setShowInput(false);
+    // Persist via extension host
+    try { await createTask(project.id, title); } catch { /* non-fatal */ }
   };
 
   return (
