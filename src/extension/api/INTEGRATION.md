@@ -51,3 +51,58 @@ Each realtime wrapper subscribes to `postgres_changes` filtered by `project_id`.
 
 - RLS is enforced in DB. These wrappers surface DB errors as thrown `Error`.
 - Keep auth session active so JWT claim `sub` is present for policies.
+
+## VS Code Command Payload Examples
+
+These are the registered command IDs from `src/extension/commands.ts`.
+
+```ts
+import * as vscode from "vscode";
+
+// create project
+await vscode.commands.executeCommand("copilotColab.project.create", {
+  name: "Hackathon Project",
+  createdBy: "<owner_user_uuid>",
+});
+
+// invite member (owner only)
+await vscode.commands.executeCommand("copilotColab.member.invite", {
+  projectId: "<project_uuid>",
+  userId: "<member_user_uuid>",
+  role: "member",
+});
+
+// remove member (owner or self)
+await vscode.commands.executeCommand("copilotColab.member.remove", {
+  projectId: "<project_uuid>",
+  userId: "<member_user_uuid>",
+});
+
+// list project members
+await vscode.commands.executeCommand("copilotColab.member.list", {
+  projectId: "<project_uuid>",
+});
+
+// list tasks/messages
+await vscode.commands.executeCommand("copilotColab.tasks.list", {
+  projectId: "<project_uuid>",
+});
+await vscode.commands.executeCommand("copilotColab.messages.list", {
+  projectId: "<project_uuid>",
+});
+
+// upsert own presence
+await vscode.commands.executeCommand("copilotColab.presence.upsert", {
+  userId: "<current_user_uuid>",
+  projectId: "<project_uuid>",
+  status: "online",
+});
+
+// subscribe/unsubscribe realtime streams
+await vscode.commands.executeCommand("copilotColab.realtime.subscribeProject", {
+  projectId: "<project_uuid>",
+});
+await vscode.commands.executeCommand("copilotColab.realtime.unsubscribeProject", {
+  projectId: "<project_uuid>",
+});
+```
