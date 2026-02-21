@@ -42,6 +42,16 @@ This file maps extension-side API wrappers to `supabase/contracts.md`.
 - `signUpWithPassword({ email, password })`
 - `signOut()`
 
+## AI wrapper (`src/extension/api/ai.ts`)
+
+- `generateWbs({ projectId, goal, constraints?, maxTasks?, existingTasks?, recentMessages?, memberCount? })`
+  - provider: Gemini REST API
+  - env:
+    - `GEMINI_API_KEY` (required to run AI command)
+    - `GEMINI_MODEL` (optional, defaults to `gemini-1.5-flash`)
+    - `GITHUB_TOKEN` (optional, for GitHub context)
+    - `GITHUB_REPOSITORY` (optional, e.g. `n4bi10p/copilot-colab`)
+
 ## Realtime wrappers (`src/extension/api/realtime.ts`)
 
 - `subscribeTasksByProject(projectId, handler)`
@@ -128,6 +138,15 @@ await vscode.commands.executeCommand("copilotColab.auth.signUpWithPassword", {
   password: "strong-password",
 });
 await vscode.commands.executeCommand("copilotColab.auth.signOut");
+
+// AI WBS generation (with optional DB persist)
+await vscode.commands.executeCommand("copilotColab.ai.generateWbs", {
+  projectId: "<project_uuid>",
+  goal: "Ship MVP collaboration extension in 24 hours",
+  constraints: ["Small team of 3", "Must include realtime sync"],
+  maxTasks: 10,
+  persist: true,
+});
 ```
 
 ## Webview Bridge Contract
@@ -166,3 +185,4 @@ Suggested frontend helper:
   - `backendClient.signInWithPassword(email, password)`
   - `backendClient.signUpWithPassword(email, password)`
   - `backendClient.signOut()`
+  - `backendClient.generateWbs({ projectId, goal, ... })`

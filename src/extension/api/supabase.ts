@@ -109,4 +109,29 @@ export class CopilotColabSupabaseApi {
     ensureNoError(error);
     return (data ?? []) as Message[];
   }
+
+  async createTasks(
+    input: Array<{
+      project_id: string;
+      title: string;
+      status?: Task["status"];
+      assignee_id?: string | null;
+    }>
+  ): Promise<Task[]> {
+    if (input.length === 0) {
+      return [];
+    }
+
+    const rows = input.map((item) => ({
+      project_id: item.project_id,
+      title: item.title,
+      status: item.status ?? "backlog",
+      assignee_id: item.assignee_id ?? null,
+    }));
+
+    const { data, error } = await this.client.from("tasks").insert(rows).select("*");
+
+    ensureNoError(error);
+    return (data ?? []) as Task[];
+  }
 }

@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 import { createClient } from "@supabase/supabase-js";
+import { CopilotColabAiApi } from "./api/ai";
 import { CopilotColabAuthApi } from "./api/auth";
+import { CopilotColabGithubApi } from "./api/github";
 import { CopilotColabRealtimeApi } from "./api/realtime";
 import { CopilotColabSupabaseApi } from "./api/supabase";
 import { registerBackendCommands, registerCommands } from "./commands";
@@ -44,10 +46,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   const client = createClient(config.url, config.anonKey);
+  const aiApi = new CopilotColabAiApi({
+    apiKey: readEnv("GEMINI_API_KEY"),
+    model: readEnv("GEMINI_MODEL"),
+  });
   const authApi = new CopilotColabAuthApi(client);
+  const githubApi = new CopilotColabGithubApi({
+    token: readEnv("GITHUB_TOKEN"),
+    repository: readEnv("GITHUB_REPOSITORY"),
+  });
   const api = new CopilotColabSupabaseApi(client);
   const realtimeApi = new CopilotColabRealtimeApi(client);
-  registerBackendCommands(context, { authApi, api, realtimeApi, output });
+  registerBackendCommands(context, { aiApi, authApi, githubApi, api, realtimeApi, output });
   output.appendLine("Copilot CoLab backend commands registered.");
 }
 
