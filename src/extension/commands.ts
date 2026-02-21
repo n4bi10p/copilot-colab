@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { CopilotColabAuthApi } from "./api/auth";
 import { CopilotColabRealtimeApi } from "./api/realtime";
 import { CopilotColabSupabaseApi } from "./api/supabase";
 import type { PresenceStatus, ProjectMemberRole } from "../types/backend";
@@ -13,6 +14,11 @@ export function registerCommands(context: vscode.ExtensionContext): void {
 }
 
 export const COMMANDS = {
+  authGetSession: "copilotColab.auth.getSession",
+  authGetUser: "copilotColab.auth.getUser",
+  authSignInPassword: "copilotColab.auth.signInWithPassword",
+  authSignUpPassword: "copilotColab.auth.signUpWithPassword",
+  authSignOut: "copilotColab.auth.signOut",
   createProject: "copilotColab.project.create",
   inviteMember: "copilotColab.member.invite",
   removeMember: "copilotColab.member.remove",
@@ -25,6 +31,7 @@ export const COMMANDS = {
 } as const;
 
 interface CommandDeps {
+  authApi: CopilotColabAuthApi;
   api: CopilotColabSupabaseApi;
   realtimeApi: CopilotColabRealtimeApi;
   output: vscode.OutputChannel;
@@ -60,6 +67,11 @@ interface SubscribeProjectArgs {
   projectId: string;
 }
 
+interface PasswordAuthArgs {
+  email: string;
+  password: string;
+}
+
 type CommandSuccess = { ok: true; data: unknown };
 type CommandFailure = { ok: false; error: string };
 type CommandResult = CommandSuccess | CommandFailure;
@@ -73,7 +85,7 @@ function fail(error: unknown): CommandFailure {
 }
 
 export function registerBackendCommands(context: vscode.ExtensionContext, deps: CommandDeps): void {
-  const { api, realtimeApi, output } = deps;
+  const { authApi, api, realtimeApi, output } = deps;
   const subscriptions = new Map<string, RealtimeChannel[]>();
 
   const register = (command: string, handler: (...args: any[]) => Promise<CommandResult>) => {
@@ -93,6 +105,34 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
       })
     );
   };
+
+  register(COMMANDS.authGetSession, async () => {
+    const data = await authApi.getSession();
+    return ok(data);
+  });
+
+  register(COMMANDS.authGetUser, async () => {
+    const data = await authApi.getCurrentUser();
+    return ok(data);
+  });
+
+  register(COMMANDS.authSignInPassword, async (args: PasswordAuthArgs) => {
+    const data = await authApi.signInWithPassword({ email: args.email, password: args.password });
+    output.appendLine(`[${COMMANDS.authSignInPassword}] email=${args.email}`);
+    return ok(data);
+  });
+
+  register(COMMANDS.authSignUpPassword, async (args: PasswordAuthArgs) => {
+    const data = await authApi.signUpWithPassword({ email: args.email, password: args.password });
+    output.appendLine(`[${COMMANDS.authSignUpPassword}] email=${args.email}`);
+    return ok(data);
+  });
+
+  register(COMMANDS.authSignOut, async () => {
+    await authApi.signOut();
+    output.appendLine(`[${COMMANDS.authSignOut}] done`);
+    return ok({ signedOut: true });
+  });
 
   register(COMMANDS.createProject, async (args: CreateProjectArgs) => {
     const data = await api.createProject({ name: args.name, createdBy: args.createdBy });

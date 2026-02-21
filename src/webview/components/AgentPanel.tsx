@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useStore } from "../../state/store";
 import type { TerminalLine } from "../../types";
+import AuthWidget from "./AuthWidget";
 
 const TERMINAL_LINES: TerminalLine[] = [
   { type: "command", text: "scanning dependency tree..." },
@@ -63,6 +64,8 @@ const AgentPanel: React.FC = () => {
           <span className="text-xs font-mono text-text-dim">ONLINE</span>
         </div>
       </div>
+
+      <AuthWidget />
 
       {/* Chat + Actions */}
       <div className="flex-1 flex flex-col gap-4 overflow-y-auto min-h-0">

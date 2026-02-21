@@ -34,6 +34,14 @@ This file maps extension-side API wrappers to `supabase/contracts.md`.
   - table: `messages`
   - contract section: fetch recent messages
 
+## Auth wrappers (`src/extension/api/auth.ts`)
+
+- `getSession()`
+- `getCurrentUser()`
+- `signInWithPassword({ email, password })`
+- `signUpWithPassword({ email, password })`
+- `signOut()`
+
 ## Realtime wrappers (`src/extension/api/realtime.ts`)
 
 - `subscribeTasksByProject(projectId, handler)`
@@ -105,4 +113,56 @@ await vscode.commands.executeCommand("copilotColab.realtime.subscribeProject", {
 await vscode.commands.executeCommand("copilotColab.realtime.unsubscribeProject", {
   projectId: "<project_uuid>",
 });
+
+// auth get session/user
+await vscode.commands.executeCommand("copilotColab.auth.getSession");
+await vscode.commands.executeCommand("copilotColab.auth.getUser");
+
+// auth password sign-in/sign-up/sign-out
+await vscode.commands.executeCommand("copilotColab.auth.signInWithPassword", {
+  email: "user@example.com",
+  password: "strong-password",
+});
+await vscode.commands.executeCommand("copilotColab.auth.signUpWithPassword", {
+  email: "user@example.com",
+  password: "strong-password",
+});
+await vscode.commands.executeCommand("copilotColab.auth.signOut");
 ```
+
+## Webview Bridge Contract
+
+Webview can call extension commands through `window.acquireVsCodeApi().postMessage`.
+
+Request:
+
+```ts
+vscode.postMessage({
+  command: "backend.execute",
+  requestId: crypto.randomUUID(),
+  commandId: "copilotColab.auth.getSession",
+  args: { /* optional */ },
+});
+```
+
+Response message shape from extension:
+
+```ts
+{
+  type: "backend.response",
+  requestId: string,
+  ok: boolean,
+  data?: unknown,
+  error?: string
+}
+```
+
+Suggested frontend helper:
+
+- Use `src/webview/utils/backendClient.ts`.
+- It wraps `backend.execute` into `backendClient.execute(...)` and exposes auth helpers:
+  - `backendClient.getSession()`
+  - `backendClient.getUser()`
+  - `backendClient.signInWithPassword(email, password)`
+  - `backendClient.signUpWithPassword(email, password)`
+  - `backendClient.signOut()`
