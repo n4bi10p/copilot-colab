@@ -60,13 +60,15 @@ interface SubscribeProjectArgs {
   projectId: string;
 }
 
-type CommandResult = { ok: true; data: unknown } | { ok: false; error: string };
+type CommandSuccess = { ok: true; data: unknown };
+type CommandFailure = { ok: false; error: string };
+type CommandResult = CommandSuccess | CommandFailure;
 
-function ok(data: unknown): CommandResult {
+function ok(data: unknown): CommandSuccess {
   return { ok: true, data };
 }
 
-function fail(error: unknown): CommandResult {
+function fail(error: unknown): CommandFailure {
   return { ok: false, error: error instanceof Error ? error.message : String(error) };
 }
 
@@ -79,7 +81,7 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
       vscode.commands.registerCommand(command, async (...args: unknown[]) => {
         try {
           const result = await handler(...args);
-          if (!result.ok) {
+          if (!result.ok && "error" in result) {
             output.appendLine(`[${command}] ERROR ${result.error}`);
           }
           return result;

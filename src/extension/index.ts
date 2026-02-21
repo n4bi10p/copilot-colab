@@ -96,7 +96,7 @@ class CoLabWebviewProvider implements vscode.WebviewViewProvider {
     content="default-src 'none';
              style-src ${webview.cspSource} 'unsafe-inline' https://fonts.googleapis.com;
              font-src ${webview.cspSource} https://fonts.gstatic.com;
-             script-src 'nonce-${nonce}';
+             script-src ${webview.cspSource} 'nonce-${nonce}';
              img-src ${webview.cspSource} https: data:;" />
   <link rel="stylesheet" href="${styleUri}" />
   <title>Copilot CoLab</title>

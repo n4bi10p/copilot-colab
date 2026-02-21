@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 const path = require("path");
+const webpack = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 
 /** @type {import('webpack').Configuration[]} */
@@ -21,7 +22,7 @@ module.exports = [
       rules: [
         {
           test: /\.ts$/,
-          use: [{ loader: "ts-loader", options: { configFile: "tsconfig.json" } }],
+          use: [{ loader: "ts-loader", options: { configFile: "tsconfig.extension.json" } }],
           exclude: /node_modules/,
         },
       ],
@@ -37,7 +38,12 @@ module.exports = [
       path: path.resolve(__dirname, "dist"),
       filename: "webview.js",
     },
-    resolve: { extensions: [".ts", ".tsx", ".js", ".jsx"] },
+    resolve: {
+      extensions: [".ts", ".tsx", ".js", ".jsx"],
+      fallback: {
+        process: require.resolve("process/browser"),
+      },
+    },
     module: {
       rules: [
         {
@@ -62,6 +68,12 @@ module.exports = [
     },
     plugins: [
       new MiniCssExtractPlugin({ filename: "webview.css" }),
+      new webpack.ProvidePlugin({
+        process: "process/browser",
+      }),
+      new webpack.DefinePlugin({
+        "process.env.NODE_ENV": JSON.stringify("production"),
+      }),
     ],
   },
 ];
