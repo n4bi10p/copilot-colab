@@ -21,7 +21,7 @@
       <img src="https://img.shields.io/github/issues/n4bi10p/copilot-colab?style=flat-square" alt="Open Issues" />
    </p>
 
-   ⚡ <a href="https://demo-url.com">Live Demo</a> · 📖 <a href="https://docs-url.com">Documentation</a> 
+   ⚡ <a href="https://demo-url.com">Live Demo</a> 
    <br/><br/>
 </div>
 
