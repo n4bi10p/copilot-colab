@@ -22,6 +22,7 @@ export const COMMANDS = {
   authSignUpPassword: "copilotColab.auth.signUpWithPassword",
   authSignOut: "copilotColab.auth.signOut",
   aiGenerateWbs: "copilotColab.ai.generateWbs",
+  aiSmokeTest: "copilotColab.ai.smokeTest",
   createProject: "copilotColab.project.create",
   inviteMember: "copilotColab.member.invite",
   removeMember: "copilotColab.member.remove",
@@ -191,6 +192,71 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
       notes: suggestion.notes,
       persistedCount,
     });
+  });
+
+  register(COMMANDS.aiSmokeTest, async () => {
+    const projectId = await vscode.window.showInputBox({
+      title: "Copilot CoLab AI Smoke Test",
+      prompt: "Project UUID",
+      placeHolder: "10ebe2d6-60d3-42f0-adf5-25ed751a44eb",
+      ignoreFocusOut: true,
+    });
+    if (!projectId?.trim()) {
+      return ok({ cancelled: true, step: "projectId" });
+    }
+
+    const goal = await vscode.window.showInputBox({
+      title: "Copilot CoLab AI Smoke Test",
+      prompt: "Planning goal",
+      value: "Plan remaining hackathon implementation tasks",
+      ignoreFocusOut: true,
+    });
+    if (!goal?.trim()) {
+      return ok({ cancelled: true, step: "goal" });
+    }
+
+    const persistChoice = await vscode.window.showQuickPick(
+      [
+        { label: "No (preview only)", value: false },
+        { label: "Yes (persist tasks)", value: true },
+      ],
+      {
+        title: "Persist generated tasks to Supabase?",
+        ignoreFocusOut: true,
+      }
+    );
+    if (!persistChoice) {
+      return ok({ cancelled: true, step: "persist" });
+    }
+
+    const maxTasksRaw = await vscode.window.showInputBox({
+      title: "Copilot CoLab AI Smoke Test",
+      prompt: "Max tasks (3-25)",
+      value: "8",
+      ignoreFocusOut: true,
+    });
+    const maxTasksParsed = Number.parseInt(maxTasksRaw ?? "8", 10);
+    const maxTasks = Number.isFinite(maxTasksParsed) ? maxTasksParsed : 8;
+
+    const result = await vscode.commands.executeCommand<CommandResult>(COMMANDS.aiGenerateWbs, {
+      projectId: projectId.trim(),
+      goal: goal.trim(),
+      constraints: ["team of 3", "ship in 36 hours"],
+      maxTasks,
+      persist: persistChoice.value,
+    } satisfies GenerateWbsArgs);
+
+    if (!result) {
+      throw new Error("No result returned from AI generate command.");
+    }
+    if (!result.ok && "error" in result) {
+      throw new Error(result.error);
+    }
+
+    output.show(true);
+    output.appendLine(`[${COMMANDS.aiSmokeTest}] success`);
+    vscode.window.showInformationMessage("Copilot CoLab AI smoke test completed.");
+    return ok((result as CommandSuccess).data);
   });
 
   register(COMMANDS.createProject, async (args: CreateProjectArgs) => {
