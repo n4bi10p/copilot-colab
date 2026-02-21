@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useStore } from "../../state/store";
 import type { TerminalLine } from "../../types";
 import AuthWidget from "./AuthWidget";
-import AICommandPanel from '../../../AICommandPanel';
+import AICommandPanel from './AICommandPanel';
 
 const TERMINAL_LINES: TerminalLine[] = [
   { type: "command", text: "scanning dependency tree..." },
