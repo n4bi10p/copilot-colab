@@ -40,9 +40,18 @@ body {
 /* ── Dashboard grid ───────────────────────────────────────────────────────── */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 80px 320px 1fr 360px;
+  grid-template-columns: 56px minmax(180px, 280px) 1fr minmax(220px, 360px);
   height: 100vh;
   overflow: hidden;
+}
+@media (max-width: 700px) {
+  .dashboard-grid {
+    grid-template-columns: 48px 1fr;
+  }
+  .dashboard-grid > :nth-child(2),
+  .dashboard-grid > :nth-child(4) {
+    display: none;
+  }
 }
 
 /* ── Material Symbols ─────────────────────────────────────────────────────── */

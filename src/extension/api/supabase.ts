@@ -103,7 +103,7 @@ export class CopilotColabSupabaseApi {
       .from("messages")
       .select("*")
       .eq("project_id", projectId)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: true })
       .limit(limit);
 
     ensureNoError(error);
@@ -133,5 +133,48 @@ export class CopilotColabSupabaseApi {
 
     ensureNoError(error);
     return (data ?? []) as Task[];
+  }
+
+  async createTask(input: { project_id: string; title: string; status?: Task["status"]; assignee_id?: string | null }): Promise<Task> {
+    const { data, error } = await this.client
+      .from("tasks")
+      .insert({
+        project_id: input.project_id,
+        title: input.title,
+        status: input.status ?? "backlog",
+        assignee_id: input.assignee_id ?? null,
+      })
+      .select("*")
+      .single();
+
+    ensureNoError(error);
+    return data as Task;
+  }
+
+  async updateTaskStatus(id: string, status: Task["status"]): Promise<Task> {
+    const { data, error } = await this.client
+      .from("tasks")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    ensureNoError(error);
+    return data as Task;
+  }
+
+  async sendMessage(input: { project_id: string; text: string; author_id: string }): Promise<Message> {
+    const { data, error } = await this.client
+      .from("messages")
+      .insert({
+        project_id: input.project_id,
+        text: input.text,
+        author_id: input.author_id,
+      })
+      .select("*")
+      .single();
+
+    ensureNoError(error);
+    return data as Message;
   }
 }

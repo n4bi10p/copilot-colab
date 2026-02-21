@@ -25,7 +25,10 @@
     "onCommand:copilotColab.member.remove",
     "onCommand:copilotColab.member.list",
     "onCommand:copilotColab.tasks.list",
+    "onCommand:copilotColab.tasks.create",
+    "onCommand:copilotColab.tasks.updateStatus",
     "onCommand:copilotColab.messages.list",
+    "onCommand:copilotColab.messages.send",
     "onCommand:copilotColab.presence.upsert",
     "onCommand:copilotColab.realtime.subscribeProject",
     "onCommand:copilotColab.realtime.unsubscribeProject"
@@ -89,8 +92,20 @@
         "title": "Copilot CoLab: List Tasks"
       },
       {
+        "command": "copilotColab.tasks.create",
+        "title": "Copilot CoLab: Create Task"
+      },
+      {
+        "command": "copilotColab.tasks.updateStatus",
+        "title": "Copilot CoLab: Update Task Status"
+      },
+      {
         "command": "copilotColab.messages.list",
         "title": "Copilot CoLab: List Messages"
+      },
+      {
+        "command": "copilotColab.messages.send",
+        "title": "Copilot CoLab: Send Message"
       },
       {
         "command": "copilotColab.presence.upsert",
@@ -152,6 +167,7 @@
     "tailwindcss": "^3.4.17",
     "ts-loader": "^9.5.4",
     "typescript": "^5.9.2",
+    "dotenv": "^16.0.0",
     "webpack": "^5.101.3",
     "webpack-cli": "^6.0.1"
   }

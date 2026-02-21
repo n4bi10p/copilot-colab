@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useStore } from "../../state/store";
 import type { TerminalLine } from "../../types";
 import AuthWidget from "./AuthWidget";
+import AICommandPanel from './AICommandPanel';
 
 const TERMINAL_LINES: TerminalLine[] = [
   { type: "command", text: "scanning dependency tree..." },
@@ -66,6 +67,10 @@ const AgentPanel: React.FC = () => {
       </div>
 
       <AuthWidget />
+      {/* AI Command Panel */}
+      <div className="my-6">
+        <AICommandPanel />
+      </div>
 
       {/* Chat + Actions */}
       <div className="flex-1 flex flex-col gap-4 overflow-y-auto min-h-0">

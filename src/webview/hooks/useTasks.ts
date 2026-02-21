@@ -1,0 +1,50 @@
+import { useEffect, useRef } from "react";
+import { useStore } from "../../state/store";
+import { backendClient, BACKEND_COMMANDS } from "../utils/backendClient";
+import type { Task, TaskStatus } from "../../types";
+
+const POLL_INTERVAL_MS = 5_000;
+
+// Subscribe to tasks for the current project — polls every 5 s
+export function useTasksListener(): void {
+  const setTasks = useStore((s) => s.setTasks);
+  const setTasksLoading = useStore((s) => s.setTasksLoading);
+  const project = useStore((s) => s.project);
+  const user = useStore((s) => s.currentUser);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstFetch = useRef(true);
+
+  useEffect(() => {
+    if (!project?.id || !user) return;
+    const projectId = project.id;
+
+    if (firstFetch.current) {
+      setTasksLoading(true);
+      firstFetch.current = false;
+    }
+
+    const fetchTasks = () => {
+      backendClient
+        .execute<Task[]>(BACKEND_COMMANDS.listTasks, { projectId })
+        .then((raw) => setTasks(Array.isArray(raw) ? raw : []))
+        .catch(() => { /* offline/preview mode – keep current tasks */ });
+    };
+
+    fetchTasks();
+    timerRef.current = setInterval(fetchTasks, POLL_INTERVAL_MS);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [project?.id, user?.uid]);
+}
+
+/** Create a task – caller should do optimistic add before calling this */
+export async function createTask(projectId: string, title: string): Promise<void> {
+  await backendClient.execute(BACKEND_COMMANDS.createTask, { projectId, title });
+}
+
+/** Update task status – caller should do optimistic move before calling this */
+export async function updateTaskStatus(id: string, status: TaskStatus): Promise<void> {
+  await backendClient.execute(BACKEND_COMMANDS.updateTaskStatus, { id, status });
+}

@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { useStore } from "../../state/store";
+import { backendClient } from "../utils/backendClient";
 
 const NAV_ITEMS = [
   { icon: "dashboard", panel: "dashboard" as const },
@@ -10,6 +11,23 @@ const NAV_ITEMS = [
 
 const NavRail: React.FC = () => {
   const { activePanel, setActivePanel } = useStore();
+  const currentUser = useStore((s) => s.currentUser);
+  const setCurrentUser = useStore((s) => s.setCurrentUser);
+  const setProject = useStore((s) => s.setProject);
+  const [showMenu, setShowMenu] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      await backendClient.signOut();
+    } catch {
+      /* ignore */
+    }
+    setCurrentUser(null);
+    setProject(null as any);
+    setShowMenu(false);
+  };
+
+  const initial = currentUser?.displayName?.charAt(0).toUpperCase() ?? currentUser?.email?.charAt(0).toUpperCase() ?? "?";
 
   return (
     <nav className="flex flex-col items-center py-6 border-r border-border-dark h-full bg-[#0c0c0e]">
@@ -38,14 +56,39 @@ const NavRail: React.FC = () => {
       </div>
 
       {/* Bottom */}
-      <div className="mt-auto flex flex-col gap-6 w-full px-2">
+      <div className="mt-auto flex flex-col gap-4 w-full px-2 relative">
         <button className="group flex items-center justify-center p-3 rounded-lg text-text-muted hover:text-white hover:bg-white/5 transition-colors">
           <span className="material-symbols-outlined text-[24px]">settings</span>
         </button>
-        <div className="size-8 rounded-full bg-surface-dark border border-white/10 overflow-hidden relative mx-auto">
-          <div className="w-full h-full bg-gradient-to-br from-blue-500/40 to-purple-500/40 flex items-center justify-center">
-            <span className="material-symbols-outlined text-white text-sm">person</span>
-          </div>
+
+        {/* User avatar + menu */}
+        <div className="relative flex justify-center">
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="size-8 rounded-full bg-surface-dark border border-white/10 overflow-hidden relative flex items-center justify-center hover:border-primary/50 transition-colors"
+            title={currentUser?.email ?? "User"}
+          >
+            <span className="text-xs font-mono text-white font-semibold">{initial}</span>
+          </button>
+
+          {/* Dropdown */}
+          {showMenu && (
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-48 bg-[#1a1a1e] border border-white/10 rounded-sm shadow-xl shadow-black/40 z-50 overflow-hidden">
+              {/* User info */}
+              <div className="px-3 py-3 border-b border-white/5">
+                <p className="text-xs font-mono text-white truncate">{currentUser?.displayName}</p>
+                <p className="text-[10px] font-mono text-text-dim truncate">{currentUser?.email}</p>
+              </div>
+              {/* Sign out */}
+              <button
+                onClick={handleSignOut}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-mono text-red-400 hover:bg-white/5 transition-colors"
+              >
+                <span className="material-symbols-outlined text-[16px]">logout</span>
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </nav>

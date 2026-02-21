@@ -31,7 +31,10 @@ export const BACKEND_COMMANDS = {
   removeMember: "copilotColab.member.remove",
   listMembers: "copilotColab.member.list",
   listTasks: "copilotColab.tasks.list",
+  createTask: "copilotColab.tasks.create",
+  updateTaskStatus: "copilotColab.tasks.updateStatus",
   listMessages: "copilotColab.messages.list",
+  sendMessage: "copilotColab.messages.send",
   upsertPresence: "copilotColab.presence.upsert",
   subscribeProject: "copilotColab.realtime.subscribeProject",
   unsubscribeProject: "copilotColab.realtime.unsubscribeProject",
@@ -59,7 +62,19 @@ export class BackendClient {
       this.pending.delete(message.requestId);
 
       if (message.ok) {
-        entry.resolve(message.data);
+        // Extension commands wrap results with ok(data) → { ok: true, data: X }.
+        // Unwrap that envelope so callers receive X directly.
+        const payload = message.data as any;
+        if (
+          payload !== null &&
+          typeof payload === "object" &&
+          payload.ok === true &&
+          Object.prototype.hasOwnProperty.call(payload, "data")
+        ) {
+          entry.resolve(payload.data);
+        } else {
+          entry.resolve(payload);
+        }
       } else {
         entry.reject(new Error(message.error ?? "Unknown backend error"));
       }

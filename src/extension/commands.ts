@@ -6,7 +6,7 @@ import { CopilotSdkApi } from "./api/copilot";
 import { CopilotColabGithubApi } from "./api/github";
 import { CopilotColabRealtimeApi } from "./api/realtime";
 import { CopilotColabSupabaseApi } from "./api/supabase";
-import type { PresenceStatus, ProjectMemberRole } from "../types/backend";
+import type { PresenceStatus, ProjectMemberRole, TaskStatus } from "../types/backend";
 
 export function registerCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
@@ -30,7 +30,10 @@ export const COMMANDS = {
   removeMember: "copilotColab.member.remove",
   listMembers: "copilotColab.member.list",
   listTasks: "copilotColab.tasks.list",
+  createTask: "copilotColab.tasks.create",
+  updateTaskStatus: "copilotColab.tasks.updateStatus",
   listMessages: "copilotColab.messages.list",
+  sendMessage: "copilotColab.messages.send",
   upsertPresence: "copilotColab.presence.upsert",
   subscribeProject: "copilotColab.realtime.subscribeProject",
   unsubscribeProject: "copilotColab.realtime.unsubscribeProject",
@@ -74,6 +77,24 @@ interface UpsertPresenceArgs {
 
 interface SubscribeProjectArgs {
   projectId: string;
+}
+
+interface CreateTaskArgs {
+  projectId: string;
+  title: string;
+  status?: TaskStatus;
+  assigneeId?: string | null;
+}
+
+interface UpdateTaskStatusArgs {
+  id: string;
+  status: TaskStatus;
+}
+
+interface SendMessageArgs {
+  projectId: string;
+  text: string;
+  authorId: string;
 }
 
 interface PasswordAuthArgs {
@@ -343,8 +364,35 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
     return ok(data);
   });
 
+  register(COMMANDS.createTask, async (args: CreateTaskArgs) => {
+    const data = await api.createTask({
+      project_id: args.projectId,
+      title: args.title,
+      status: args.status,
+      assignee_id: args.assigneeId ?? null,
+    });
+    output.appendLine(`[${COMMANDS.createTask}] id=${data.id} title=${args.title}`);
+    return ok(data);
+  });
+
+  register(COMMANDS.updateTaskStatus, async (args: UpdateTaskStatusArgs) => {
+    const data = await api.updateTaskStatus(args.id, args.status);
+    output.appendLine(`[${COMMANDS.updateTaskStatus}] id=${args.id} status=${args.status}`);
+    return ok(data);
+  });
+
   register(COMMANDS.listMessages, async (args: ListByProjectArgs) => {
     const data = await api.listMessagesByProject(args.projectId);
+    return ok(data);
+  });
+
+  register(COMMANDS.sendMessage, async (args: SendMessageArgs) => {
+    const data = await api.sendMessage({
+      project_id: args.projectId,
+      text: args.text,
+      author_id: args.authorId,
+    });
+    output.appendLine(`[${COMMANDS.sendMessage}] id=${data.id}`);
     return ok(data);
   });
 

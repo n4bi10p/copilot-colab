@@ -1,13 +1,14 @@
 import React, { useState } from "react";
 import { useStore } from "../../state/store";
+import { updateTaskStatus } from "../hooks/useTasks";
+import { LoadingState, EmptyState } from "./StatusState";
 import type { Task, TaskStatus } from "../../types";
 
 const STATUSES: { value: TaskStatus | "all"; label: string; color: string }[] = [
   { value: "all", label: "All Tasks", color: "text-text-muted" },
   { value: "backlog", label: "Backlog", color: "text-text-muted" },
-  { value: "in-progress", label: "In Progress", color: "text-blue-400" },
-  { value: "review", label: "Review", color: "text-yellow-400" },
-  { value: "merged", label: "Merged", color: "text-emerald-400" },
+  { value: "in_progress", label: "In Progress", color: "text-blue-400" },
+  { value: "done", label: "Done", color: "text-emerald-400" },
 ];
 
 const ALL_TAGS = ["backend", "infra", "perf", "maint", "frontend", "high-priority"];
@@ -15,9 +16,8 @@ const ALL_TAGS = ["backend", "infra", "perf", "maint", "frontend", "high-priorit
 const StatusBadge: React.FC<{ status: TaskStatus }> = ({ status }) => {
   const map: Record<TaskStatus, string> = {
     backlog: "text-text-muted border-white/10 bg-white/5",
-    "in-progress": "text-blue-400 border-blue-400/20 bg-blue-400/10",
-    review: "text-yellow-400 border-yellow-400/20 bg-yellow-400/10",
-    merged: "text-emerald-400 border-emerald-400/20 bg-emerald-400/10",
+    in_progress: "text-blue-400 border-blue-400/20 bg-blue-400/10",
+    done: "text-emerald-400 border-emerald-400/20 bg-emerald-400/10",
   };
   return (
     <span className={`px-2 py-0.5 rounded-sm border text-[10px] font-mono uppercase ${map[status]}`}>
@@ -39,7 +39,7 @@ const TaskRow: React.FC<{
     <span className="text-xs font-mono text-text-dim w-20 shrink-0">{task.id}</span>
     <span
       className={`flex-1 text-sm font-medium leading-snug truncate
-        ${task.status === "merged" ? "text-text-dim line-through" : "text-text-main group-hover:text-white"}`}
+        ${task.status === "done" ? "text-text-dim line-through" : "text-text-main group-hover:text-white"}`}
     >
       {task.hasConflict && (
         <span className="material-symbols-outlined text-[12px] text-accent-warm mr-1 align-middle">warning</span>
@@ -63,10 +63,9 @@ const TaskDetail: React.FC<{ task: Task }> = ({ task }) => {
   const [title, setTitle] = useState(task.title);
 
   const NEXT_STATUS: Record<TaskStatus, TaskStatus | null> = {
-    backlog: "in-progress",
-    "in-progress": "review",
-    review: "merged",
-    merged: null,
+    backlog: "in_progress",
+    in_progress: "done",
+    done: null,
   };
   const next = NEXT_STATUS[task.status];
 
@@ -98,7 +97,7 @@ const TaskDetail: React.FC<{ task: Task }> = ({ task }) => {
         <h2
           onClick={() => setEditing(true)}
           className={`text-xl font-semibold leading-snug mb-6 cursor-text hover:text-white transition-colors
-            ${task.status === "merged" ? "text-text-dim line-through" : "text-text-main"}`}
+            ${task.status === "done" ? "text-text-dim line-through" : "text-text-main"}`}
         >
           {task.title}
         </h2>
@@ -168,14 +167,21 @@ const TaskDetail: React.FC<{ task: Task }> = ({ task }) => {
 
       {/* Timestamps */}
       <div className="mb-8 text-xs font-mono text-text-dim space-y-1">
-        <p>Created: {new Date(task.createdAt).toLocaleString()}</p>
-        <p>Updated: {new Date(task.updatedAt).toLocaleString()}</p>
+        <p>Created: {new Date(task.created_at).toLocaleString()}</p>
+        <p>Updated: {new Date(task.updated_at).toLocaleString()}</p>
       </div>
 
       {/* Move to next status */}
       {next && (
         <button
-          onClick={() => moveTask(task.id, next)}
+          onClick={() => {
+            const prev = task.status;
+            moveTask(task.id, next);
+            updateTaskStatus(task.id, next).catch(() => {
+              // Rollback on failure
+              moveTask(task.id, prev);
+            });
+          }}
           className="mt-auto w-full flex items-center justify-between p-4 bg-primary text-white rounded-sm hover:bg-primary/90 transition-colors group"
         >
           <span className="text-sm font-medium tracking-wide uppercase">Move to {next}</span>
@@ -188,27 +194,38 @@ const TaskDetail: React.FC<{ task: Task }> = ({ task }) => {
 
 const TasksView: React.FC = () => {
   const tasks = useStore((s) => s.tasks);
+  const tasksLoading = useStore((s) => s.tasksLoading);
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "all">("all");
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(tasks[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(safeTasks[0]?.id ?? null);
 
-  const filtered = tasks.filter((t) => {
+  const filtered = safeTasks.filter((t) => {
     if (filterStatus !== "all" && t.status !== filterStatus) return false;
     if (filterTag && !t.tags?.includes(filterTag)) return false;
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
-  const selectedTask = tasks.find((t) => t.id === selectedId) ?? null;
+  const selectedTask = safeTasks.find((t) => t.id === selectedId) ?? null;
 
   const countByStatus = (s: TaskStatus | "all") =>
-    s === "all" ? tasks.length : tasks.filter((t) => t.status === s).length;
+    s === "all" ? safeTasks.length : safeTasks.filter((t) => t.status === s).length;
+
+  // Full loading state
+  if (tasksLoading && safeTasks.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center bg-[#111113]">
+        <LoadingState label="Loading tasks…" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* Filter Sidebar */}
-      <aside className="w-56 shrink-0 border-r border-border-dark bg-[#0f0f11] flex flex-col p-5 overflow-y-auto">
+      <aside className="w-44 shrink-0 border-r border-border-dark bg-[#0f0f11] flex flex-col p-4 overflow-y-auto hidden md:flex">
         <h2 className="text-xs font-mono tracking-editorial text-text-dim uppercase mb-6">Filters</h2>
 
         {/* Status filters */}
@@ -249,7 +266,7 @@ const TasksView: React.FC = () => {
       </aside>
 
       {/* Task List */}
-      <div className="flex flex-col w-[400px] shrink-0 border-r border-border-dark bg-[#111113] overflow-hidden">
+      <div className="flex flex-col w-full md:w-[320px] shrink-0 border-r border-border-dark bg-[#111113] overflow-hidden">
         {/* Search header */}
         <div className="p-4 border-b border-border-dark">
           <div className="flex items-center gap-2 bg-surface-dark border border-white/5 rounded-sm px-3 py-2">
