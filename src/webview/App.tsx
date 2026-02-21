@@ -3,6 +3,7 @@ import NavRail from "./components/NavRail";
 import StatColumn from "./components/StatColumn";
 import TaskBoard from "./components/TaskBoard";
 import AgentPanel from "./components/AgentPanel";
+import ChatPanel from "./components/ChatPanel";
 import TasksView from "./components/TasksView";
 import AgentView from "./components/AgentView";
 import TerminalView from "./components/TerminalView";
@@ -213,20 +214,22 @@ const App: React.FC = () => {
     <>
       <ToastContainer />
       <RealtimeListeners />
-      {activePanel === "dashboard" ? (
+      {(activePanel === "dashboard" || activePanel === "chat") ? (
         <div className="dashboard-grid bg-background-dark selection:bg-primary/30 selection:text-white">
           <NavRail />
           <StatColumn />
-          <TaskBoard />
-          <AgentPanel />
+          {activePanel === "dashboard" && <TaskBoard />}
+          {activePanel === "dashboard" && <AgentPanel />}
+          {(activePanel as string) === "chat" && <ChatPanel />}
         </div>
       ) : (
         <div className="flex h-screen overflow-hidden bg-background-dark selection:bg-primary/30 selection:text-white">
           <NavRail />
-          {activePanel === "tasks" && <TasksView />}
-          {activePanel === "agent" && <AgentView />}
-          {activePanel === "terminal" && <TerminalView />}
-          {activePanel === "settings" && <SettingsPanel />}
+          {(activePanel as string) === "tasks" && <TasksView />}
+          {(activePanel as string) === "chat" && <ChatPanel />}
+          {(activePanel as string) === "agent" && <AgentView />}
+          {(activePanel as string) === "terminal" && <TerminalView />}
+          {(activePanel as string) === "settings" && <SettingsPanel />}
         </div>
       )}
     </>

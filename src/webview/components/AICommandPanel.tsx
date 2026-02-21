@@ -1,6 +1,8 @@
+
 import React, { useState } from "react";
 import { backendClient, BACKEND_COMMANDS } from "../utils/backendClient";
 import { useStore } from "../../state/store";
+import type { Task } from "../../types";
 
 type CopilotResponse = {
   content: string;
@@ -42,6 +44,8 @@ const AICommandPanel: React.FC = () => {
   const [prNumberInput, setPrNumberInput] = useState("");
   const [prComment, setPrComment] = useState("");
   const [githubResult, setGithubResult] = useState<string | null>(null);
+  const [persist, setPersist] = useState(true);
+  const addTask = useStore((s) => s.addTask);
 
   const openLink = (url: string) => {
     if (!url) return;
@@ -52,15 +56,26 @@ const AICommandPanel: React.FC = () => {
     setLoading(true);
     setError(null);
     setResult(null);
-
     try {
       const data = await backendClient.suggestFromSelection<CopilotResponse>({
         prompt: prompt.trim(),
         model,
       });
       setResult(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Copilot request failed.");
+    } catch (err: any) {
+      let msg = "Copilot request failed.";
+      if (err && typeof err.message === "string") {
+        if (err.message.includes("401") || err.message.toLowerCase().includes("key")) {
+          msg = "Invalid Gemini API key. Please check your .env configuration.";
+        } else if (err.message.toLowerCase().includes("rate limit")) {
+          msg = "Gemini API rate limit or quota exceeded. Try again later.";
+        } else if (err.message.toLowerCase().includes("timeout")) {
+          msg = "Network timeout. Please check your connection or try again.";
+        } else {
+          msg = err.message;
+        }
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -316,7 +331,15 @@ const AICommandPanel: React.FC = () => {
           placeholder="Optional instruction for Copilot..."
           className="w-full bg-white/5 border border-white/10 rounded-sm px-3 py-2 text-xs font-mono text-text-main placeholder-text-dim outline-none focus:border-primary/50 resize-none"
         />
-
+        <label className="flex items-center gap-2 text-xs font-mono text-text-dim">
+          <input
+            type="checkbox"
+            checked={persist}
+            onChange={() => setPersist((v) => !v)}
+            className="accent-primary"
+          />
+          Persist generated tasks to board
+        </label>
         <button
           onClick={runSuggestion}
           disabled={loading}
