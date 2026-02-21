@@ -172,7 +172,7 @@ Create, assign, and update tasks instantly.
 ```
 Let Gemini generate a work breakdown structure for your project.
 
-> [!NOTE] For more examples, see [Documentation](https://docs-url.com).
+
 <!-- Add a workflow GIF here showing the above in action -->
 
 ## ⚙️ Configuration
