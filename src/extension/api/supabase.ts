@@ -163,13 +163,21 @@ export class CopilotColabSupabaseApi {
     return data as Task;
   }
 
-  async sendMessage(input: { project_id: string; text: string; author_id: string }): Promise<Message> {
+  async sendMessage(input: {
+    project_id: string;
+    text: string;
+    author_id: string;
+    sender_kind?: "user" | "assistant";
+    sender_label?: string | null;
+  }): Promise<Message> {
     const { data, error } = await this.client
       .from("messages")
       .insert({
         project_id: input.project_id,
         text: input.text,
         author_id: input.author_id,
+        sender_kind: input.sender_kind ?? "user",
+        sender_label: input.sender_label ?? null,
       })
       .select("*")
       .single();

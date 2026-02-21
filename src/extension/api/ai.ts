@@ -28,6 +28,13 @@ export interface GenerateWbsOutput {
   model: string;
 }
 
+export interface GenerateMentionReplyInput {
+  projectId: string;
+  message: string;
+  existingTasks?: Task[];
+  recentMessages?: Message[];
+}
+
 interface AiConfig {
   apiKey?: string;
   model?: string;
@@ -85,11 +92,74 @@ export class CopilotColabAiApi {
     }
 
     const maxTasks = Math.max(3, Math.min(input.maxTasks ?? 10, 25));
+    const prompt = this.buildPrompt({ ...input, maxTasks });
+    const text = await this.generateText(prompt);
+    if (!text) {
+      throw new Error("Gemini returned an empty response.");
+    }
+
+    const jsonText = extractJsonObject(text);
+    const parsed = JSON.parse(jsonText) as { tasks?: unknown[]; notes?: unknown[] };
+    const tasks = (parsed.tasks ?? []).map(toTaskSuggestion).filter((task): task is WbsTaskSuggestion => Boolean(task));
+    if (tasks.length === 0) {
+      throw new Error("Gemini returned no valid tasks.");
+    }
+
+    const notes = Array.isArray(parsed.notes) ? parsed.notes.map((item) => String(item)) : [];
+
+    return {
+      tasks: tasks.slice(0, maxTasks),
+      notes,
+      model: this.model,
+    };
+  }
+
+  async generateMentionReply(input: GenerateMentionReplyInput): Promise<{ text: string; model: string }> {
+    if (!this.apiKey) {
+      throw new Error("GEMINI_API_KEY is missing. Set it in your extension launch environment.");
+    }
+
+    const recentChat = (input.recentMessages ?? [])
+      .slice(-8)
+      .map((message) => `- ${message.text}`)
+      .join("\n");
+    const taskContext = (input.existingTasks ?? [])
+      .slice(0, 10)
+      .map((task) => `- [${task.status}] ${task.title}`)
+      .join("\n");
+
+    const prompt = [
+      "You are Gemini, a helpful teammate assistant inside a collaborative engineering chat.",
+      "Reply directly to the latest user message that mentioned @gemini.",
+      "Keep the response concise and action-oriented.",
+      "Use plain text only. No markdown code fences.",
+      "If details are missing, ask one targeted follow-up question.",
+      "",
+      `Project ID: ${input.projectId}`,
+      "",
+      "Recent chat context:",
+      recentChat || "- none",
+      "",
+      "Current tasks:",
+      taskContext || "- none",
+      "",
+      "Latest message to answer:",
+      input.message,
+      "",
+      "Return only the reply text.",
+    ].join("\n");
+
+    const text = (await this.generateText(prompt)).trim();
+    if (!text) {
+      throw new Error("Gemini returned an empty mention reply.");
+    }
+    return { text, model: this.model };
+  }
+
+  private async generateText(prompt: string): Promise<string> {
     const endpoint =
       `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent` +
-      `?key=${encodeURIComponent(this.apiKey)}`;
-
-    const prompt = this.buildPrompt({ ...input, maxTasks });
+      `?key=${encodeURIComponent(this.apiKey ?? "")}`;
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -112,25 +182,7 @@ export class CopilotColabAiApi {
       }>;
     };
 
-    const text = payload.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) {
-      throw new Error("Gemini returned an empty response.");
-    }
-
-    const jsonText = extractJsonObject(text);
-    const parsed = JSON.parse(jsonText) as { tasks?: unknown[]; notes?: unknown[] };
-    const tasks = (parsed.tasks ?? []).map(toTaskSuggestion).filter((task): task is WbsTaskSuggestion => Boolean(task));
-    if (tasks.length === 0) {
-      throw new Error("Gemini returned no valid tasks.");
-    }
-
-    const notes = Array.isArray(parsed.notes) ? parsed.notes.map((item) => String(item)) : [];
-
-    return {
-      tasks: tasks.slice(0, maxTasks),
-      notes,
-      model: this.model,
-    };
+    return payload.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
   }
 
   private buildPrompt(input: Required<Pick<GenerateWbsInput, "projectId" | "goal" | "maxTasks">> &

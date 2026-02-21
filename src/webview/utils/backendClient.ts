@@ -26,6 +26,12 @@ export const BACKEND_COMMANDS = {
   authSignOut: "copilotColab.auth.signOut",
   aiGenerateWbs: "copilotColab.ai.generateWbs",
   aiSuggestFromSelection: "copilotColab.ai.suggestFromSelection",
+  backendSmokeTest: "copilotColab.backend.smokeTest",
+  githubRepoSummary: "copilotColab.github.repoSummary",
+  githubListOpenPrs: "copilotColab.github.listOpenPrs",
+  githubCreatePr: "copilotColab.github.createPr",
+  githubMergePr: "copilotColab.github.mergePr",
+  githubCommentPr: "copilotColab.github.commentPr",
   createProject: "copilotColab.project.create",
   inviteMember: "copilotColab.member.invite",
   removeMember: "copilotColab.member.remove",
@@ -35,6 +41,7 @@ export const BACKEND_COMMANDS = {
   updateTaskStatus: "copilotColab.tasks.updateStatus",
   listMessages: "copilotColab.messages.list",
   sendMessage: "copilotColab.messages.send",
+  sendMessageAndList: "copilotColab.messages.sendAndList",
   upsertPresence: "copilotColab.presence.upsert",
   subscribeProject: "copilotColab.realtime.subscribeProject",
   unsubscribeProject: "copilotColab.realtime.unsubscribeProject",
@@ -63,15 +70,18 @@ export class BackendClient {
 
       if (message.ok) {
         // Extension commands wrap results with ok(data) → { ok: true, data: X }.
-        // Unwrap that envelope so callers receive X directly.
+        // Unwrap that envelope so callers receive X directly and reject when command-level ok=false.
         const payload = message.data as any;
         if (
           payload !== null &&
           typeof payload === "object" &&
-          payload.ok === true &&
-          Object.prototype.hasOwnProperty.call(payload, "data")
+          Object.prototype.hasOwnProperty.call(payload, "ok")
         ) {
-          entry.resolve(payload.data);
+          if (payload.ok === true && Object.prototype.hasOwnProperty.call(payload, "data")) {
+            entry.resolve(payload.data);
+          } else {
+            entry.reject(new Error(String(payload.error ?? "Unknown backend command error")));
+          }
         } else {
           entry.resolve(payload);
         }
@@ -146,6 +156,35 @@ export class BackendClient {
     cliUrl?: string;
   }): Promise<T> {
     return this.execute<T>(BACKEND_COMMANDS.aiSuggestFromSelection, args, 20_000);
+  }
+
+  getGithubRepoSummary<T = unknown>(): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.githubRepoSummary, undefined, 20_000);
+  }
+
+  listOpenPullRequests<T = unknown>(): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.githubListOpenPrs, undefined, 20_000);
+  }
+
+  createPullRequest<T = unknown>(args: {
+    title: string;
+    head: string;
+    base: string;
+    body?: string;
+  }): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.githubCreatePr, args, 20_000);
+  }
+
+  commentOnPullRequest<T = unknown>(args: { pullNumber: number; body: string }): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.githubCommentPr, args, 20_000);
+  }
+
+  mergePullRequest<T = unknown>(args: {
+    pullNumber: number;
+    method?: "merge" | "squash" | "rebase";
+    commitTitle?: string;
+  }): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.githubMergePr, args, 20_000);
   }
 
   private makeRequestId(): string {

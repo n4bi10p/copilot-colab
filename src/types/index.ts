@@ -45,6 +45,8 @@ export interface Message {
   project_id: string;
   text: string;
   author_id: string;
+  sender_kind?: "user" | "assistant";
+  sender_label?: string | null;
   created_at: string;
 }
 

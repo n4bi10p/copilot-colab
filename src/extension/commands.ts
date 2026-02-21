@@ -25,6 +25,12 @@ export const COMMANDS = {
   aiGenerateWbs: "copilotColab.ai.generateWbs",
   aiSuggestFromSelection: "copilotColab.ai.suggestFromSelection",
   aiSmokeTest: "copilotColab.ai.smokeTest",
+  backendSmokeTest: "copilotColab.backend.smokeTest",
+  githubRepoSummary: "copilotColab.github.repoSummary",
+  githubListOpenPrs: "copilotColab.github.listOpenPrs",
+  githubCreatePr: "copilotColab.github.createPr",
+  githubMergePr: "copilotColab.github.mergePr",
+  githubCommentPr: "copilotColab.github.commentPr",
   createProject: "copilotColab.project.create",
   inviteMember: "copilotColab.member.invite",
   removeMember: "copilotColab.member.remove",
@@ -34,6 +40,7 @@ export const COMMANDS = {
   updateTaskStatus: "copilotColab.tasks.updateStatus",
   listMessages: "copilotColab.messages.list",
   sendMessage: "copilotColab.messages.send",
+  sendMessageAndList: "copilotColab.messages.sendAndList",
   upsertPresence: "copilotColab.presence.upsert",
   subscribeProject: "copilotColab.realtime.subscribeProject",
   unsubscribeProject: "copilotColab.realtime.unsubscribeProject",
@@ -97,6 +104,10 @@ interface SendMessageArgs {
   authorId: string;
 }
 
+interface SendMessageAndListArgs extends SendMessageArgs {
+  limit?: number;
+}
+
 interface PasswordAuthArgs {
   email: string;
   password: string;
@@ -116,6 +127,29 @@ interface SuggestFromSelectionArgs {
   cliUrl?: string;
 }
 
+interface BackendSmokeTestArgs {
+  projectId?: string;
+  authorId?: string;
+}
+
+interface GithubCreatePrArgs {
+  title: string;
+  head: string;
+  base: string;
+  body?: string;
+}
+
+interface GithubMergePrArgs {
+  pullNumber: number;
+  method?: "merge" | "squash" | "rebase";
+  commitTitle?: string;
+}
+
+interface GithubCommentPrArgs {
+  pullNumber: number;
+  body: string;
+}
+
 type CommandSuccess = { ok: true; data: unknown };
 type CommandFailure = { ok: false; error: string };
 type CommandResult = CommandSuccess | CommandFailure;
@@ -128,9 +162,42 @@ function fail(error: unknown): CommandFailure {
   return { ok: false, error: error instanceof Error ? error.message : String(error) };
 }
 
+function hasGeminiMention(text: string): boolean {
+  return /(^|\s)@gemini\b/i.test(text);
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_MESSAGE_LENGTH = 4000;
+const GEMINI_MENTION_COOLDOWN_MS = 20_000;
+
+function makeCommandError(code: string, message: string): Error {
+  return new Error(`[${code}] ${message}`);
+}
+
+function assertUuid(value: string, fieldName: string): void {
+  if (!UUID_RE.test(value.trim())) {
+    throw makeCommandError("VALIDATION_INVALID_UUID", `${fieldName} must be a valid UUID.`);
+  }
+}
+
+function normalizeMessageText(value: string): string {
+  const text = value.trim();
+  if (!text) {
+    throw makeCommandError("VALIDATION_EMPTY_MESSAGE", "Message text cannot be empty.");
+  }
+  if (text.length > MAX_MESSAGE_LENGTH) {
+    throw makeCommandError(
+      "VALIDATION_MESSAGE_TOO_LONG",
+      `Message text exceeds ${MAX_MESSAGE_LENGTH} characters.`
+    );
+  }
+  return text;
+}
+
 export function registerBackendCommands(context: vscode.ExtensionContext, deps: CommandDeps): void {
   const { aiApi, copilotApi, authApi, githubApi, api, realtimeApi, output } = deps;
   const subscriptions = new Map<string, RealtimeChannel[]>();
+  const geminiMentionCooldown = new Map<string, number>();
 
   const register = (command: string, handler: (...args: any[]) => Promise<CommandResult>) => {
     context.subscriptions.push(
@@ -329,6 +396,75 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
     return ok((result as CommandSuccess).data);
   });
 
+  register(COMMANDS.backendSmokeTest, async (args: BackendSmokeTestArgs = {}) => {
+    const result: Record<string, unknown> = {
+      auth: false,
+      github: false,
+      messageRoundtrip: false,
+    };
+
+    const user = await authApi.getCurrentUser();
+    result.auth = true;
+    result.userId = user?.id ?? null;
+
+    try {
+      const summary = await githubApi.getRepositorySummary();
+      result.github = true;
+      result.repository = summary.repository;
+    } catch (error) {
+      result.github = false;
+      result.githubError = error instanceof Error ? error.message : String(error);
+    }
+
+    if (args.projectId && args.authorId) {
+      assertUuid(args.projectId, "projectId");
+      assertUuid(args.authorId, "authorId");
+      await vscode.commands.executeCommand(COMMANDS.sendMessage, {
+        projectId: args.projectId,
+        authorId: args.authorId,
+        text: "[smoke] backend roundtrip test",
+      } satisfies SendMessageArgs);
+      const rows = await api.listMessagesByProject(args.projectId, 5);
+      result.messageRoundtrip = true;
+      result.recentMessages = rows.length;
+    }
+
+    output.appendLine(`[${COMMANDS.backendSmokeTest}] ${JSON.stringify(result)}`);
+    return ok(result);
+  });
+
+  register(COMMANDS.githubRepoSummary, async () => {
+    const data = await githubApi.getRepositorySummary();
+    output.appendLine(`[${COMMANDS.githubRepoSummary}] repo=${data.repository}`);
+    return ok(data);
+  });
+
+  register(COMMANDS.githubListOpenPrs, async () => {
+    const data = await githubApi.listOpenPullRequests();
+    output.appendLine(`[${COMMANDS.githubListOpenPrs}] count=${data.length}`);
+    return ok(data);
+  });
+
+  register(COMMANDS.githubCreatePr, async (args: GithubCreatePrArgs) => {
+    const data = await githubApi.createPullRequest(args);
+    output.appendLine(`[${COMMANDS.githubCreatePr}] #${data.number} ${data.title}`);
+    return ok(data);
+  });
+
+  register(COMMANDS.githubCommentPr, async (args: GithubCommentPrArgs) => {
+    const data = await githubApi.commentOnPullRequest(args.pullNumber, args.body);
+    output.appendLine(`[${COMMANDS.githubCommentPr}] #${args.pullNumber} comment=${data.id}`);
+    return ok(data);
+  });
+
+  register(COMMANDS.githubMergePr, async (args: GithubMergePrArgs) => {
+    const data = await githubApi.mergePullRequest(args.pullNumber, args.method ?? "squash", args.commitTitle);
+    output.appendLine(
+      `[${COMMANDS.githubMergePr}] #${args.pullNumber} merged=${data.merged} message=${data.message}`
+    );
+    return ok(data);
+  });
+
   register(COMMANDS.createProject, async (args: CreateProjectArgs) => {
     const data = await api.createProject({ name: args.name, createdBy: args.createdBy });
     output.appendLine(`[${COMMANDS.createProject}] project=${data.id}`);
@@ -387,13 +523,75 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
   });
 
   register(COMMANDS.sendMessage, async (args: SendMessageArgs) => {
-    const data = await api.sendMessage({
+    assertUuid(args.projectId, "projectId");
+    assertUuid(args.authorId, "authorId");
+    const safeText = normalizeMessageText(args.text);
+
+    const userMessage = await api.sendMessage({
       project_id: args.projectId,
-      text: args.text,
+      text: safeText,
       author_id: args.authorId,
+      sender_kind: "user",
+      sender_label: null,
     });
-    output.appendLine(`[${COMMANDS.sendMessage}] id=${data.id}`);
-    return ok(data);
+
+    let geminiReplyId: string | null = null;
+    if (hasGeminiMention(safeText)) {
+      try {
+        const cooldownKey = `${args.projectId}:${args.authorId}`;
+        const now = Date.now();
+        const lastRun = geminiMentionCooldown.get(cooldownKey) ?? 0;
+        if (now - lastRun < GEMINI_MENTION_COOLDOWN_MS) {
+          output.appendLine(
+            `[${COMMANDS.sendMessage}] gemini mention skipped: cooldown active (${Math.ceil(
+              (GEMINI_MENTION_COOLDOWN_MS - (now - lastRun)) / 1000
+            )}s left)`
+          );
+        } else {
+          geminiMentionCooldown.set(cooldownKey, now);
+          const [existingTasks, recentMessages] = await Promise.all([
+            api.listTasksByProject(args.projectId),
+            api.listMessagesByProject(args.projectId, 20),
+          ]);
+
+        const reply = await aiApi.generateMentionReply({
+          projectId: args.projectId,
+          message: args.text,
+          existingTasks,
+          recentMessages,
+        });
+
+          const geminiMessage = await api.sendMessage({
+            project_id: args.projectId,
+            text: reply.text,
+            author_id: args.authorId,
+            sender_kind: "assistant",
+            sender_label: "gemini",
+          });
+          geminiReplyId = geminiMessage.id;
+        }
+      } catch (error) {
+        output.appendLine(
+          `[${COMMANDS.sendMessage}] gemini mention failed: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+
+    output.appendLine(`[${COMMANDS.sendMessage}] id=${userMessage.id} geminiReply=${geminiReplyId ?? "none"}`);
+    return ok(userMessage);
+  });
+
+  register(COMMANDS.sendMessageAndList, async (args: SendMessageAndListArgs) => {
+    assertUuid(args.projectId, "projectId");
+    assertUuid(args.authorId, "authorId");
+    const limit = Math.max(1, Math.min(args.limit ?? 100, 200));
+    await vscode.commands.executeCommand(COMMANDS.sendMessage, {
+      projectId: args.projectId,
+      text: args.text,
+      authorId: args.authorId,
+    } satisfies SendMessageArgs);
+    const messages = await api.listMessagesByProject(args.projectId, limit);
+    return ok(messages);
   });
 
   register(COMMANDS.upsertPresence, async (args: UpsertPresenceArgs) => {

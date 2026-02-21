@@ -20,6 +20,12 @@
     "onCommand:copilotColab.ai.generateWbs",
     "onCommand:copilotColab.ai.suggestFromSelection",
     "onCommand:copilotColab.ai.smokeTest",
+    "onCommand:copilotColab.backend.smokeTest",
+    "onCommand:copilotColab.github.repoSummary",
+    "onCommand:copilotColab.github.listOpenPrs",
+    "onCommand:copilotColab.github.createPr",
+    "onCommand:copilotColab.github.mergePr",
+    "onCommand:copilotColab.github.commentPr",
     "onCommand:copilotColab.project.create",
     "onCommand:copilotColab.member.invite",
     "onCommand:copilotColab.member.remove",
@@ -29,6 +35,7 @@
     "onCommand:copilotColab.tasks.updateStatus",
     "onCommand:copilotColab.messages.list",
     "onCommand:copilotColab.messages.send",
+    "onCommand:copilotColab.messages.sendAndList",
     "onCommand:copilotColab.presence.upsert",
     "onCommand:copilotColab.realtime.subscribeProject",
     "onCommand:copilotColab.realtime.unsubscribeProject"
@@ -72,6 +79,30 @@
         "title": "Copilot CoLab: AI Smoke Test"
       },
       {
+        "command": "copilotColab.backend.smokeTest",
+        "title": "Copilot CoLab: Backend Smoke Test"
+      },
+      {
+        "command": "copilotColab.github.repoSummary",
+        "title": "Copilot CoLab: GitHub Repo Summary"
+      },
+      {
+        "command": "copilotColab.github.listOpenPrs",
+        "title": "Copilot CoLab: GitHub List Open PRs"
+      },
+      {
+        "command": "copilotColab.github.createPr",
+        "title": "Copilot CoLab: GitHub Create PR"
+      },
+      {
+        "command": "copilotColab.github.mergePr",
+        "title": "Copilot CoLab: GitHub Merge PR"
+      },
+      {
+        "command": "copilotColab.github.commentPr",
+        "title": "Copilot CoLab: GitHub Comment PR"
+      },
+      {
         "command": "copilotColab.project.create",
         "title": "Copilot CoLab: Create Project"
       },
@@ -106,6 +137,10 @@
       {
         "command": "copilotColab.messages.send",
         "title": "Copilot CoLab: Send Message"
+      },
+      {
+        "command": "copilotColab.messages.sendAndList",
+        "title": "Copilot CoLab: Send Message And List"
       },
       {
         "command": "copilotColab.presence.upsert",

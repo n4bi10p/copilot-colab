@@ -32,6 +32,8 @@ export interface Message {
   project_id: string;
   text: string;
   author_id: string;
+  sender_kind?: "user" | "assistant";
+  sender_label?: string | null;
   created_at: string;
 }
 
@@ -72,7 +74,7 @@ export interface Database {
       messages: {
         Row: Message;
         Insert: Pick<Message, "project_id" | "text" | "author_id"> &
-          Partial<Pick<Message, "id" | "created_at">>;
+          Partial<Pick<Message, "id" | "created_at" | "sender_kind" | "sender_label">>;
         Update: Partial<Pick<Message, "text">>;
       };
       presence: {
