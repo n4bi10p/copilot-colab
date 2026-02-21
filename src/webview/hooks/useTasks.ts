@@ -12,16 +12,13 @@ export function useTasksListener(): void {
   const project = useStore((s) => s.project);
   const user = useStore((s) => s.currentUser);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const firstFetch = useRef(true);
 
   useEffect(() => {
     if (!project?.id || !user) return;
     const projectId = project.id;
 
-    if (firstFetch.current) {
-      setTasksLoading(true);
-      firstFetch.current = false;
-    }
+    // Treat every new project/user combination as a fresh first fetch
+    setTasksLoading(true);
 
     const fetchTasks = () => {
       backendClient

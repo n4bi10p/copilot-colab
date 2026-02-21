@@ -24,6 +24,7 @@ export const BACKEND_COMMANDS = {
   authSignInPassword: "copilotColab.auth.signInWithPassword",
   authSignUpPassword: "copilotColab.auth.signUpWithPassword",
   authSignOut: "copilotColab.auth.signOut",
+  authSignInOAuth: "copilotColab.auth.signInWithOAuth",
   aiGenerateWbs: "copilotColab.ai.generateWbs",
   aiSuggestFromSelection: "copilotColab.ai.suggestFromSelection",
   backendSmokeTest: "copilotColab.backend.smokeTest",
@@ -138,6 +139,10 @@ export class BackendClient {
 
   signOut<T = unknown>(): Promise<T> {
     return this.execute<T>(BACKEND_COMMANDS.authSignOut);
+  }
+
+  signInWithOAuth<T = unknown>(provider: "github" | "google"): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.authSignInOAuth, { provider }, 130_000);
   }
 
   generateWbs<T = unknown>(args: {

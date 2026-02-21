@@ -144,6 +144,7 @@ const App: React.FC = () => {
   const currentUser = useStore((s) => s.currentUser);
   const authReady = useStore((s) => s.authReady);
   const project = useStore((s) => s.project);
+  const sessionExpired = useStore((s) => s.sessionExpired);
 
   if (!authReady) {
     return (
@@ -153,7 +154,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (!currentUser) return <AuthGate />;
+  if (!currentUser) return <AuthGate sessionExpired={sessionExpired} />;
   if (!project?.id) return <ProjectBootstrap />;
 
   return (
