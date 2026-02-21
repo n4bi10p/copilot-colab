@@ -1,8 +1,7 @@
 
 
 <div align="center">
-   <!-- LOGO: Replace with your project logo -->
-   <img src="https://placehold.co/120x120?text=Logo" alt="Copilot CoLab Logo" width="120" />
+   <img src="media/icon.png" alt="Copilot CoLab Logo" width="120" />
 
    # 🚀 Copilot CoLab
 

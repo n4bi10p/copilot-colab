@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "publisher": "n4bi10p",
+  "icon": "media/icon.png",
   "description": "VS Code extension for Copilot CoLab collaboration with Supabase backend.",
   "engines": {
     "vscode": "^1.90.0"
