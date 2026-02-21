@@ -22,6 +22,7 @@ export const COMMANDS = {
   authSignInPassword: "copilotColab.auth.signInWithPassword",
   authSignUpPassword: "copilotColab.auth.signUpWithPassword",
   authSignOut: "copilotColab.auth.signOut",
+  authSignInOAuth: "copilotColab.auth.signInWithOAuth",
   aiGenerateWbs: "copilotColab.ai.generateWbs",
   aiSuggestFromSelection: "copilotColab.ai.suggestFromSelection",
   aiSmokeTest: "copilotColab.ai.smokeTest",
@@ -102,6 +103,10 @@ interface PasswordAuthArgs {
   password: string;
 }
 
+interface OAuthArgs {
+  provider: "github" | "google";
+}
+
 interface GenerateWbsArgs {
   projectId: string;
   goal: string;
@@ -176,6 +181,13 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
     await authApi.signOut();
     output.appendLine(`[${COMMANDS.authSignOut}] done`);
     return ok({ signedOut: true });
+  });
+
+  register(COMMANDS.authSignInOAuth, async (args: OAuthArgs) => {
+    const extensionId = context.extension.id;
+    const session = await authApi.signInWithOAuth(args.provider, extensionId);
+    output.appendLine(`[${COMMANDS.authSignInOAuth}] provider=${args.provider} user=${session?.user?.email ?? "unknown"}`);
+    return ok(session?.user ?? null);
   });
 
   register(COMMANDS.aiGenerateWbs, async (args: GenerateWbsArgs) => {
