@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 const path = require("path");
+const webpack = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+require("dotenv").config();
 
 /** @type {import('webpack').Configuration[]} */
 module.exports = [
@@ -62,6 +64,10 @@ module.exports = [
     },
     plugins: [
       new MiniCssExtractPlugin({ filename: "webview.css" }),
+      new webpack.DefinePlugin({
+        __SUPABASE_URL__: JSON.stringify(process.env.SUPABASE_URL || ""),
+        __SUPABASE_ANON_KEY__: JSON.stringify(process.env.SUPABASE_ANON_KEY || ""),
+      }),
     ],
   },
 ];

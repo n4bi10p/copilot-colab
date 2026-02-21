@@ -4,17 +4,16 @@ import type { Task, TaskStatus } from "../../types";
 
 const COLUMNS: { status: TaskStatus; label: string }[] = [
   { status: "backlog", label: "Backlog" },
-  { status: "in-progress", label: "In Progress" },
-  { status: "review", label: "Review" },
-  { status: "merged", label: "Merged" },
+  { status: "in_progress", label: "In Progress" },
+  { status: "done", label: "Done" },
 ];
 
 // ── Task Card ────────────────────────────────────────────────────────────────
 const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
-  const isMerged = task.status === "merged";
+  const isDone = task.status === "done";
   const isConflict = task.hasConflict;
   const isReadyToMerge =
-    task.status === "review" &&
+    task.status === "in_progress" &&
     task.approvals !== undefined &&
     task.approvals === task.totalApprovals;
 
@@ -22,7 +21,7 @@ const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
     <div
       className={`bg-surface-dark border border-white/5 p-4 rounded-sm transition-colors group cursor-grab active:cursor-grabbing
         ${isConflict ? "border-l-2 border-l-accent-warm rounded-r-sm rounded-l-none shadow-lg shadow-black/20 hover:bg-white/[0.02]" : "hover:border-white/10"}
-        ${isMerged ? "" : ""}`}
+        ${isDone ? "opacity-70" : ""}`}
     >
       {/* Card Header */}
       <div className="flex justify-between items-start mb-3">
@@ -34,7 +33,7 @@ const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
         ) : isReadyToMerge ? (
           <span className="text-xs font-mono text-emerald-500">READY TO MERGE</span>
         ) : (
-          <span className={`text-xs font-mono text-text-dim ${isMerged ? "line-through" : ""}`}>
+          <span className={`text-xs font-mono text-text-dim ${isDone ? "line-through" : ""}`}>
             {task.id}
           </span>
         )}
@@ -42,7 +41,7 @@ const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
         {/* Right indicator */}
         {isReadyToMerge ? (
           <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-        ) : isMerged ? (
+        ) : isDone ? (
           <span className="material-symbols-outlined text-[16px] text-text-dim">check_circle</span>
         ) : task.tags?.includes("purple") ? (
           <span className="size-2 rounded-full bg-purple-500/20 border border-purple-500/50" />
@@ -52,7 +51,7 @@ const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
       {/* Title */}
       <h3
         className={`text-sm font-medium leading-snug mb-3
-          ${isMerged ? "text-text-dim line-through" : "text-gray-200 group-hover:text-white"}`}
+          ${isDone ? "text-text-dim line-through" : "text-gray-200 group-hover:text-white"}`}
       >
         {task.title}
       </h3>
@@ -68,7 +67,7 @@ const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
       )}
 
       {/* Footer */}
-      {!isMerged && (
+      {!isDone && (
         <div className="flex items-center justify-between mt-auto">
           {/* Tags */}
           {task.tags && task.tags.length > 0 && (
@@ -88,7 +87,7 @@ const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
           )}
 
           {/* Review info */}
-          {task.status === "review" && (
+          {task.status === "in_progress" && task.prNumber && (
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-1 text-text-dim">
                 {task.approvals !== undefined ? (
@@ -131,11 +130,11 @@ const KanbanColumn: React.FC<{ status: TaskStatus; label: string; tasks: Task[] 
     if (!newTitle.trim()) return;
     addTask({
       id: `TASK-${Date.now()}`,
-      projectId: "demo-project",
+      project_id: "demo-project",
       title: newTitle.trim(),
       status,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     });
     setNewTitle("");
     setShowInput(false);
@@ -144,7 +143,7 @@ const KanbanColumn: React.FC<{ status: TaskStatus; label: string; tasks: Task[] 
   return (
     <div
       className={`flex flex-col w-[320px] shrink-0 gap-4 h-full
-        ${status === "merged" ? "opacity-60 hover:opacity-100 transition-opacity" : ""}`}
+        ${status === "done" ? "opacity-60 hover:opacity-100 transition-opacity" : ""}`}
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-mono text-text-muted uppercase tracking-widest">{label}</span>
@@ -157,7 +156,7 @@ const KanbanColumn: React.FC<{ status: TaskStatus; label: string; tasks: Task[] 
       ))}
 
       {/* Add Task */}
-      {status !== "merged" && (
+      {status !== "done" && (
         <>
           {showInput ? (
             <div className="flex flex-col gap-2">

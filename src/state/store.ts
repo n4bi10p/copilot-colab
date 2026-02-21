@@ -15,6 +15,8 @@ interface AppState {
   // Auth
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
+  authReady: boolean;
+  setAuthReady: (ready: boolean) => void;
 
   // Project
   project: Project | null;
@@ -53,6 +55,8 @@ export const useStore = create<AppState>((set) => ({
   // Auth
   currentUser: null,
   setCurrentUser: (user) => set({ currentUser: user }),
+  authReady: false,
+  setAuthReady: (ready) => set({ authReady: ready }),
 
   // Project
   project: {
@@ -60,8 +64,8 @@ export const useStore = create<AppState>((set) => ({
     name: "Project Alpha",
     version: "v2.4.0",
     env: "prod-us-east",
-    createdAt: Date.now(),
-    createdBy: "demo",
+    created_at: new Date().toISOString(),
+    created_by: "demo",
   },
   setProject: (project) => set({ project }),
 
@@ -69,79 +73,79 @@ export const useStore = create<AppState>((set) => ({
   tasks: [
     {
       id: "NET-204",
-      projectId: "demo-project",
+      project_id: "demo-project",
       title: "Refactor auth middleware for new token standard",
       status: "backlog",
       tags: ["backend"],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "NET-221",
-      projectId: "demo-project",
+      project_id: "demo-project",
       title: "Implement Redis caching layer",
       status: "backlog",
       tags: ["infra", "perf"],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "NET-conflict",
-      projectId: "demo-project",
+      project_id: "demo-project",
       title: "Fix race condition in payment API webhook handler",
-      status: "in-progress",
+      status: "in_progress",
       priority: "high",
       hasConflict: true,
       progress: 66,
       tags: ["high-priority"],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "NET-199",
-      projectId: "demo-project",
+      project_id: "demo-project",
       title: "Update dependencies for security patch",
-      status: "in-progress",
+      status: "in_progress",
       tags: ["maint"],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "NET-review-1",
-      projectId: "demo-project",
+      project_id: "demo-project",
       title: "API Gateway schema validation",
-      status: "review",
+      status: "in_progress",
       prNumber: "#4092",
       approvals: 2,
       totalApprovals: 2,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "NET-215",
-      projectId: "demo-project",
+      project_id: "demo-project",
       title: "Dashboard V2 layout implementation",
-      status: "review",
+      status: "in_progress",
       prNumber: "#4088",
       commentCount: 5,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "NET-188",
-      projectId: "demo-project",
+      project_id: "demo-project",
       title: "User profile image optimization",
-      status: "merged",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      status: "done",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "NET-192",
-      projectId: "demo-project",
+      project_id: "demo-project",
       title: "Dark mode toggle persistence",
-      status: "merged",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      status: "done",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
   ],
   setTasks: (tasks) => set({ tasks }),
@@ -153,7 +157,7 @@ export const useStore = create<AppState>((set) => ({
   moveTask: (id, status) =>
     set((s) => ({
       tasks: s.tasks.map((t) =>
-        t.id === id ? { ...t, status, updatedAt: Date.now() } : t
+        t.id === id ? { ...t, status, updated_at: new Date().toISOString() } : t
       ),
     })),
 

@@ -1,12 +1,14 @@
 // ── Task ─────────────────────────────────────────────────────────────────────
-export type TaskStatus = "backlog" | "in-progress" | "review" | "merged";
+// Aligned with Nabil's Supabase schema (snake_case field names)
+export type TaskStatus = "backlog" | "in_progress" | "done";
 
 export interface Task {
   id: string;
-  projectId: string;
+  project_id: string;
   title: string;
   status: TaskStatus;
-  assigneeId?: string;
+  assignee_id?: string | null;
+  // Frontend-only display fields
   tags?: string[];
   priority?: "low" | "medium" | "high";
   progress?: number; // 0-100
@@ -15,13 +17,11 @@ export interface Task {
   approvals?: number;
   totalApprovals?: number;
   commentCount?: number;
-  createdAt: number;
-  updatedAt: number;
+  created_at: string;
+  updated_at: string;
 }
 
-// ── User / Presence ──────────────────────────────────────────────────────────
-export type PresenceStatus = "online" | "idle" | "offline";
-
+// ── User ──────────────────────────────────────────────────────────────────────
 export interface User {
   uid: string;
   displayName: string;
@@ -29,23 +29,23 @@ export interface User {
   photoURL?: string;
 }
 
+// ── Presence ──────────────────────────────────────────────────────────────────
+export type PresenceStatus = "online" | "idle";
+
 export interface Presence {
-  userId: string;
-  projectId: string;
+  user_id: string;
+  project_id: string;
   status: PresenceStatus;
-  lastActiveAt: number;
-  activeFile?: string;
+  last_active_at: string;
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
 export interface Message {
   id: string;
-  projectId: string;
+  project_id: string;
   text: string;
-  authorId: string;
-  authorName: string;
-  authorPhoto?: string;
-  createdAt: number;
+  author_id: string;
+  created_at: string;
 }
 
 // ── Project ──────────────────────────────────────────────────────────────────
@@ -54,8 +54,8 @@ export interface Project {
   name: string;
   version?: string;
   env?: string;
-  createdAt: number;
-  createdBy: string;
+  created_at: string;
+  created_by: string;
 }
 
 // ── Dashboard metrics ────────────────────────────────────────────────────────
