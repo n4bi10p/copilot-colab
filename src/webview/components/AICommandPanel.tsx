@@ -1,11 +1,19 @@
+
 import React, { useState } from "react";
 import { backendClient } from "../utils/backendClient";
+import { useStore } from "../../state/store";
+import type { Task } from "../../types";
+
 
 export default function AICommandPanel() {
   const [input, setInput] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [persist, setPersist] = useState(true);
+  const addTask = useStore((s) => s.addTask);
+  const project = useStore((s) => s.project);
+
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -15,21 +23,53 @@ export default function AICommandPanel() {
     }
     setError("");
     setLoading(true);
+    setResponse("");
     try {
       const rawResponse = await backendClient.generateWbs({
-        projectId: "demo-project-id",
+        projectId: project?.id || "demo-project-id",
         goal: input,
-        persist: true,
+        persist,
       });
-      const res = rawResponse as { notes?: string; generated?: unknown[] };
+      const res = rawResponse as { notes?: string; generated?: any[] };
+      // Optimistically insert generated tasks if persist is true and tasks are present
+      if (persist && Array.isArray(res.generated) && project?.id) {
+        res.generated.forEach((t, idx) => {
+          // Map Gemini response to Task type (best effort)
+          const task: Task = {
+            id: t.id || `AI-${Date.now()}-${idx}`,
+            project_id: project.id,
+            title: t.title || (typeof t === "string" ? t : `AI Task ${idx + 1}`),
+            status: t.status || "backlog",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            // Optionally map tags, priority, etc. if present
+            ...(t.tags ? { tags: t.tags } : {}),
+            ...(t.priority ? { priority: t.priority } : {}),
+            ...(t.progress ? { progress: t.progress } : {}),
+          };
+          addTask(task);
+        });
+      }
       setResponse(
         res.notes ??
           (res.generated
             ? JSON.stringify(res.generated, null, 2)
             : "No tasks generated.")
       );
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "AI command failed.");
+    } catch (err: any) {
+      let msg = "AI command failed.";
+      if (err && typeof err.message === "string") {
+        if (err.message.includes("401") || err.message.toLowerCase().includes("key")) {
+          msg = "Invalid Gemini API key. Please check your .env configuration.";
+        } else if (err.message.toLowerCase().includes("rate limit")) {
+          msg = "Gemini API rate limit or quota exceeded. Try again later.";
+        } else if (err.message.toLowerCase().includes("timeout")) {
+          msg = "Network timeout. Please check your connection or try again.";
+        } else {
+          msg = err.message;
+        }
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -48,6 +88,15 @@ export default function AICommandPanel() {
           placeholder="Describe your goal…"
           className="w-full bg-white/5 border border-white/10 rounded-sm px-3 py-2 text-xs font-mono text-text-main placeholder-text-dim outline-none focus:border-primary/50"
         />
+        <label className="flex items-center gap-2 text-xs font-mono text-text-dim">
+          <input
+            type="checkbox"
+            checked={persist}
+            onChange={() => setPersist((v) => !v)}
+            className="accent-primary"
+          />
+          Persist generated tasks to board
+        </label>
         <button
           type="submit"
           disabled={loading}

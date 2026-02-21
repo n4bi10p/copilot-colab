@@ -3,6 +3,7 @@ import NavRail from "./components/NavRail";
 import StatColumn from "./components/StatColumn";
 import TaskBoard from "./components/TaskBoard";
 import AgentPanel from "./components/AgentPanel";
+import ChatPanel from "./components/ChatPanel";
 import TasksView from "./components/TasksView";
 import AgentView from "./components/AgentView";
 import TerminalView from "./components/TerminalView";
@@ -159,17 +160,19 @@ const App: React.FC = () => {
   return (
     <>
       <RealtimeListeners />
-      {activePanel === "dashboard" ? (
+      {activePanel === "dashboard" || activePanel === "chat" ? (
         <div className="dashboard-grid bg-background-dark selection:bg-primary/30 selection:text-white">
           <NavRail />
           <StatColumn />
-          <TaskBoard />
-          <AgentPanel />
+          {activePanel === "dashboard" && <TaskBoard />}
+          {activePanel === "dashboard" && <AgentPanel />}
+          {activePanel === "chat" && <ChatPanel />}
         </div>
       ) : (
         <div className="flex h-screen overflow-hidden bg-background-dark selection:bg-primary/30 selection:text-white">
           <NavRail />
           {activePanel === "tasks" && <TasksView />}
+          {activePanel === "chat" && <ChatPanel />}
           {activePanel === "agent" && <AgentView />}
           {activePanel === "terminal" && <TerminalView />}
         </div>

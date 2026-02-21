@@ -50,7 +50,7 @@ interface AppState {
   addAgentMessage: (msg: AgentMessage) => void;
 
   // UI
-  activePanel: "dashboard" | "tasks" | "agent" | "terminal";
+  activePanel: "dashboard" | "tasks" | "chat" | "agent" | "terminal";
   setActivePanel: (panel: AppState["activePanel"]) => void;
 }
 

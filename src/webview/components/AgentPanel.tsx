@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useStore } from "../../state/store";
-import type { TerminalLine } from "../../types";
+import { backendClient } from "../utils/backendClient";
+import type { TerminalLine, Message } from "../../types";
 import AuthWidget from "./AuthWidget";
 import AICommandPanel from './AICommandPanel';
+
 
 const TERMINAL_LINES: TerminalLine[] = [
   { type: "command", text: "scanning dependency tree..." },
@@ -15,42 +17,73 @@ const TERMINAL_LINES: TerminalLine[] = [
 ];
 
 const AgentPanel: React.FC = () => {
-  const { agentMessages, addAgentMessage } = useStore();
+  const messages = useStore((s) => s.messages);
+  const setMessages = useStore((s) => s.setMessages);
+  const addMessage = useStore((s) => s.addMessage);
+  const currentUser = useStore((s) => s.currentUser);
+  const project = useStore((s) => s.project);
   const [inputValue, setInputValue] = useState("");
+  const [sending, setSending] = useState(false);
 
   const handleActionClick = (action: string) => {
-    addAgentMessage({
+    addMessage({
       id: `user-${Date.now()}`,
-      role: "user",
-      content: `[${action}]`,
-      timestamp: Date.now(),
+      text: `[${action}]`,
+      author_id: currentUser?.uid || "user",
+      project_id: project?.id || "",
+      created_at: new Date().toISOString(),
     });
 
     // Simulate agent response
     setTimeout(() => {
-      addAgentMessage({
+      addMessage({
         id: `agent-${Date.now()}`,
-        role: "agent",
-        content:
+        text:
           action === "Run Analysis"
             ? "Running predictive analysis on affected lines in payment-api.ts...\n\nFound 3 conflicting sections. Generating diff..."
             : action === "Diff Check"
             ? "Fetching latest diff from origin/main. Comparing 142 lines..."
             : "Conflict warning dismissed. I'll re-check on next sync.",
-        timestamp: Date.now(),
+        author_id: "gemini",
+        project_id: project?.id || "",
+        created_at: new Date().toISOString(),
       });
     }, 800);
   };
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
-    addAgentMessage({
-      id: `user-${Date.now()}`,
-      role: "user",
-      content: inputValue.trim(),
-      timestamp: Date.now(),
-    });
+  // Fetch messages from DB on mount
+  useEffect(() => {
+    async function fetchMessages() {
+      if (!project?.id) return;
+      try {
+        const dbMessages = await backendClient.execute<Message[]>("copilotColab.messages.list", { projectId: project.id });
+        setMessages(Array.isArray(dbMessages) ? dbMessages : []);
+      } catch {
+        // fallback: keep current messages
+      }
+    }
+    fetchMessages();
+  }, [project?.id, setMessages]);
+
+  // Send message to backend and optimistically add
+  const handleSend = async () => {
+    if (!inputValue.trim() || !project?.id || !currentUser?.uid) return;
+    setSending(true);
+    const msg: Message = {
+      id: `msg-${Date.now()}`,
+      project_id: project.id,
+      text: inputValue.trim(),
+      author_id: currentUser.uid,
+      created_at: new Date().toISOString(),
+    };
+    addMessage(msg);
     setInputValue("");
+    try {
+      await backendClient.execute("copilotColab.messages.send", msg);
+    } catch {
+      // Optionally show error or retry
+    }
+    setSending(false);
   };
 
   return (
@@ -72,99 +105,48 @@ const AgentPanel: React.FC = () => {
         <AICommandPanel />
       </div>
 
-      {/* Chat + Actions */}
-      <div className="flex-1 flex flex-col gap-4 overflow-y-auto min-h-0">
-        {agentMessages.map((msg) => (
-          <div key={msg.id} className="flex flex-col gap-3">
-            <div className="flex gap-4">
-              {msg.role === "agent" ? (
-                <div className="size-8 rounded bg-surface-dark border border-white/10 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-white text-sm">smart_toy</span>
-                </div>
-              ) : (
-                <div className="size-8 rounded bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-primary text-sm">person</span>
-                </div>
-              )}
-              <div className="flex flex-col gap-2">
-                {msg.content.split("\n\n").map((para, i) => (
-                  <p key={i} className="text-sm text-text-main leading-relaxed">
-                    {para.includes("payment-api.ts") ? (
-                      <>
-                        {para.split("payment-api.ts")[0]}
-                        <span className="font-mono text-accent-warm bg-accent-warm/10 px-1 py-0.5 rounded-sm">
-                          payment-api.ts
-                        </span>
-                        {para.split("payment-api.ts")[1]}
-                      </>
-                    ) : (
-                      para
-                    )}
-                  </p>
-                ))}
-              </div>
-            </div>
 
-            {/* Action chips (only for agent messages with actions) */}
-            {msg.role === "agent" && msg.actions && msg.actions.length > 0 && (
-              <div className="flex flex-wrap gap-2 pl-12">
-                {msg.actions.map((action) => (
-                  <button
-                    key={action}
-                    onClick={() => handleActionClick(action)}
-                    className="px-3 py-1.5 rounded-sm border border-[#3F3F46] text-[#A1A1AA] text-xs font-mono hover:border-white/30 hover:text-white transition-all bg-transparent"
-                  >
-                    [{action}]
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
 
-        <div className="w-full h-px bg-border-dark my-2" />
-
-        {/* Terminal Output */}
-        <div className="flex flex-col gap-2 bg-surface-dark border border-white/5 p-4 rounded-sm font-mono text-[11px] h-48 overflow-y-auto font-light shrink-0">
-          <div className="flex justify-between text-text-dim border-b border-white/5 pb-2 mb-2">
-            <span>TERMINAL OUTPUT</span>
-            <span>bash</span>
-          </div>
-          {TERMINAL_LINES.map((line, i) => {
-            if (line.type === "cursor") {
-              return (
-                <div key={i} className="flex items-center gap-1 mt-1">
-                  <span className="text-blue-500">➜</span>
-                  <span className="w-2 h-4 bg-text-muted animate-pulse" />
-                </div>
-              );
-            }
-            return (
-              <p
-                key={i}
-                className={
-                  line.type === "command"
-                    ? "text-text-muted"
-                    : line.type === "success"
-                    ? "text-emerald-500/80"
-                    : line.type === "warning"
-                    ? "text-yellow-500/80"
-                    : line.type === "error"
-                    ? "text-red-500/80"
-                    : "text-text-dim"
-                }
-              >
-                {line.type === "command" && (
-                  <>
-                    <span className="text-blue-500">➜ </span>
-                    <span className="text-cyan-500">~ </span>
-                  </>
-                )}
-                {line.text}
-              </p>
-            );
-          })}
+      {/* Terminal Output */}
+      <div className="flex flex-col gap-2 bg-surface-dark border border-white/5 p-4 rounded-sm font-mono text-[11px] h-48 overflow-y-auto font-light shrink-0">
+        <div className="flex justify-between text-text-dim border-b border-white/5 pb-2 mb-2">
+          <span>TERMINAL OUTPUT</span>
+          <span>bash</span>
         </div>
+        {TERMINAL_LINES.map((line, i) => {
+          if (line.type === "cursor") {
+            return (
+              <div key={i} className="flex items-center gap-1 mt-1">
+                <span className="text-blue-500">➜</span>
+                <span className="w-2 h-4 bg-text-muted animate-pulse" />
+              </div>
+            );
+          }
+          return (
+            <p
+              key={i}
+              className={
+                line.type === "command"
+                  ? "text-text-muted"
+                  : line.type === "success"
+                  ? "text-emerald-500/80"
+                  : line.type === "warning"
+                  ? "text-yellow-500/80"
+                  : line.type === "error"
+                  ? "text-red-500/80"
+                  : "text-text-dim"
+              }
+            >
+              {line.type === "command" && (
+                <>
+                  <span className="text-blue-500">➜ </span>
+                  <span className="text-cyan-500">~ </span>
+                </>
+              )}
+              {line.text}
+            </p>
+          );
+        })}
       </div>
 
       {/* Input */}

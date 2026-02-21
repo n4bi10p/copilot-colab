@@ -5,6 +5,7 @@ import { backendClient } from "../utils/backendClient";
 const NAV_ITEMS = [
   { icon: "dashboard", panel: "dashboard" as const },
   { icon: "account_tree", panel: "tasks" as const },
+  { icon: "chat_bubble", panel: "chat" as const },
   { icon: "smart_toy", panel: "agent" as const },
   { icon: "terminal", panel: "terminal" as const },
 ];
