@@ -4,7 +4,8 @@
   "private": true,
   "description": "Backend integration layer for Copilot CoLab Supabase.",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.backend.json",
+    "typecheck:all": "tsc --noEmit -p tsconfig.json",
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
