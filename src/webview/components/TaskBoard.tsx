@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useStore } from "../../state/store";
-import { createTask, updateTaskAssignee } from "../hooks/useTasks";
+import { createTask, updateTaskAssignee, aiAssignTasks } from "../hooks/useTasks";
 import { LoadingState, EmptyState } from "./StatusState";
 import type { Task, TaskStatus, ProjectMember } from "../../types";
 
@@ -299,7 +299,31 @@ const TaskBoard: React.FC = () => {
   const tasks = useStore((s) => s.tasks);
   const tasksLoading = useStore((s) => s.tasksLoading);
   const members = useStore((s) => s.members);
+  const project = useStore((s) => s.project);
+  const addToast = useStore((s) => s.addToast);
+  const [assigning, setAssigning] = useState(false);
   const safeTasks = Array.isArray(tasks) ? tasks : [];
+
+  const handleAiAssign = async () => {
+    if (!project?.id || assigning) return;
+    setAssigning(true);
+    try {
+      const result = await aiAssignTasks(project.id);
+      addToast({
+        id: Date.now().toString(),
+        type: "success",
+        message: `Gemini assigned ${result.assigned} of ${result.total} unassigned tasks`,
+      });
+    } catch (err) {
+      addToast({
+        id: Date.now().toString(),
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to assign tasks via AI",
+      });
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   const getTasksByStatus = (status: TaskStatus) =>
     safeTasks.filter((t) => t.status === status);
@@ -322,6 +346,19 @@ const TaskBoard: React.FC = () => {
           )}
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleAiAssign}
+            disabled={assigning || safeTasks.length === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-sm text-indigo-400 text-[11px] font-mono hover:bg-indigo-500/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Let Gemini auto-assign unassigned tasks to team members"
+          >
+            {assigning ? (
+              <span className="size-3 border border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
+            ) : (
+              <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+            )}
+            {assigning ? "Assigning..." : "Assign via Gemini"}
+          </button>
           <button className="text-text-muted hover:text-white transition-colors">
             <span className="material-symbols-outlined text-[18px]">filter_list</span>
           </button>

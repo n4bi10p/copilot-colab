@@ -173,6 +173,10 @@
         "title": "Copilot CoLab: Upsert Presence"
       },
       {
+        "command": "copilotColab.ai.assignTasks",
+        "title": "Copilot CoLab: AI Assign Tasks"
+      },
+      {
         "command": "copilotColab.realtime.subscribeProject",
         "title": "Copilot CoLab: Subscribe Realtime"
       },

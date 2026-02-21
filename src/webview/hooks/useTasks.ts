@@ -51,4 +51,9 @@ export async function updateTaskAssignee(id: string, assigneeId: string | null):
   await backendClient.updateTaskAssignee(id, assigneeId);
 }
 
+/** AI-powered task assignment — assigns unassigned tasks to team members */
+export async function aiAssignTasks(projectId: string): Promise<{ assigned: number; total: number }> {
+  return backendClient.aiAssignTasks<{ assigned: number; total: number }>(projectId);
+}
+
 

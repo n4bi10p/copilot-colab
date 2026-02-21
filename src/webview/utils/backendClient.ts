@@ -245,6 +245,10 @@ export class BackendClient {
     return this.execute<T>(BACKEND_COMMANDS.updateTaskAssignee, { id, assigneeId });
   }
 
+  aiAssignTasks<T = unknown>(projectId: string): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.aiAssignTasks, { projectId }, 30_000);
+  }
+
   private makeRequestId(): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();

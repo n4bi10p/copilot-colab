@@ -116,6 +116,10 @@ interface UpdateTaskAssigneeArgs {
   assigneeId: string | null;
 }
 
+interface AssignTasksArgs {
+  projectId: string;
+}
+
 interface SendMessageArgs {
   projectId: string;
   text: string;

@@ -95,6 +95,7 @@ const AgentPanel: React.FC = () => {
   const currentUser = useStore((s) => s.currentUser);
   const project = useStore((s) => s.project);
   const addMessage = useStore((s) => s.addMessage);
+  const setMessages = useStore((s) => s.setMessages);
   const updateMessage = useStore((s) => s.updateMessage);
   const removeMessage = useStore((s) => s.removeMessage);
   const unreadCount = useStore((s) => s.unreadCount);
@@ -161,9 +162,10 @@ const AgentPanel: React.FC = () => {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
 
     try {
-      await backendClient.sendMessage(project.id, text, currentUser.uid);
-      // Remove optimistic — real message arrives via polling
+      const freshList = await backendClient.sendMessageAndList<Message[]>(project.id, text, currentUser.uid);
+      // Replace optimistic message with the real server list
       removeMessage(tempId);
+      if (Array.isArray(freshList)) setMessages(freshList);
     } catch (err) {
       updateMessage(tempId, { _status: "failed" });
       setSendError(err instanceof Error ? err.message : "Failed to send message");

@@ -203,21 +203,75 @@ COPILOT_CLI_URL=http://localhost:4321
 
 > [!WARNING] Never commit your Supabase or Gemini keys to public repos.
 
-## 🧩 Backend Command Quick Reference
+## 🔌 Backend Command Reference
 
-Core backend commands exposed by the extension host:
+The webview communicates with the extension host via `postMessage` → `vscode.commands.executeCommand`. Below are all registered backend commands:
 
-- `copilotColab.project.resolveForWorkspace`: resolve/create project using workspace repo mapping.
-- `copilotColab.ai.generateWbs`: generate task breakdown, optional persist.
-- `copilotColab.ai.assignTasks`: assign tasks to members with Gemini, optional persist.
-- `copilotColab.ai.assignTasksPrompt`: prompt-driven assignment test from Command Palette.
-- `copilotColab.messages.send`: send chat message, triggers `@gemini` auto-reply.
-- `copilotColab.messages.sendAndList`: send + return latest messages (UI-friendly roundtrip).
-- `copilotColab.messages.subscribeState`: get current messages + ensure realtime subscription.
-- `copilotColab.realtime.subscribeProject` / `copilotColab.realtime.unsubscribeProject`: realtime lifecycle.
-- `copilotColab.realtime.health`: inspect current subscription status.
-- `copilotColab.backend.smokeTest`: quick backend checks.
-- `copilotColab.demo.healthcheck`: demo readiness check (auth, project, github, messages, realtime).
+### Auth
+| Command | Description |
+|---------|-------------|
+| `copilotColab.auth.getSession` | Get current auth session |
+| `copilotColab.auth.getUser` | Get current user |
+| `copilotColab.auth.signInWithPassword` | Sign in with email + password |
+| `copilotColab.auth.signUpWithPassword` | Sign up with email + password |
+| `copilotColab.auth.signOut` | Sign out |
+| `copilotColab.auth.signInWithOAuth` | OAuth sign in (GitHub/Google) |
+
+### Chat
+| Command | Description |
+|---------|-------------|
+| `copilotColab.messages.list` | Load messages for a project |
+| `copilotColab.messages.send` | Send a message (triggers `@gemini` auto-reply) |
+| `copilotColab.messages.sendAndList` | Send a message and return updated list (atomic) |
+| `copilotColab.messages.subscribeState` | Get current messages + ensure realtime subscription |
+
+### Tasks
+| Command | Description |
+|---------|-------------|
+| `copilotColab.tasks.list` | List tasks for a project |
+| `copilotColab.tasks.create` | Create a new task |
+| `copilotColab.tasks.updateStatus` | Update task status (backlog/in_progress/done) |
+| `copilotColab.tasks.updateAssignee` | Assign/unassign a task |
+
+### AI
+| Command | Description |
+|---------|-------------|
+| `copilotColab.ai.generateWbs` | Generate Work Breakdown Structure via Gemini |
+| `copilotColab.ai.assignTasks` | AI-powered bulk task assignment to team members |
+| `copilotColab.ai.assignTasksPrompt` | Prompt-driven assignment test from Command Palette |
+| `copilotColab.ai.suggestFromSelection` | Suggest code from editor selection |
+
+### GitHub
+| Command | Description |
+|---------|-------------|
+| `copilotColab.github.repoSummary` | Get repository summary |
+| `copilotColab.github.listOpenPrs` | List open pull requests |
+| `copilotColab.github.createPr` | Create a pull request |
+| `copilotColab.github.mergePr` | Merge a pull request |
+| `copilotColab.github.commentPr` | Comment on a pull request |
+
+### Project & Members
+| Command | Description |
+|---------|-------------|
+| `copilotColab.project.create` | Create/resolve a project |
+| `copilotColab.project.resolveForWorkspace` | Resolve/create project using workspace repo mapping |
+| `copilotColab.member.invite` | Invite a member |
+| `copilotColab.member.remove` | Remove a member |
+| `copilotColab.member.list` | List project members |
+
+### Presence & Realtime
+| Command | Description |
+|---------|-------------|
+| `copilotColab.presence.upsert` | Update presence status |
+| `copilotColab.realtime.subscribeProject` | Subscribe to realtime events (tasks, messages, presence) |
+| `copilotColab.realtime.unsubscribeProject` | Unsubscribe from realtime events |
+| `copilotColab.realtime.health` | Inspect current subscription status |
+
+### Diagnostics
+| Command | Description |
+|---------|-------------|
+| `copilotColab.backend.smokeTest` | Quick backend checks |
+| `copilotColab.demo.healthcheck` | Demo readiness check (auth, project, github, messages, realtime) |
 
 ## ✅ Demo E2E Checklist
 
