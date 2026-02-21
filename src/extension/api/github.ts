@@ -11,11 +11,15 @@ interface GithubConfig {
 
 export class CopilotColabGithubApi {
   private readonly token?: string;
-  private readonly repository?: string;
+  private repository?: string;
 
   constructor(config: GithubConfig) {
     this.token = config.token;
     this.repository = config.repository;
+  }
+
+  setRepository(repository?: string): void {
+    this.repository = repository;
   }
 
   async getRecentContext(): Promise<GithubContext | null> {

@@ -50,7 +50,7 @@ This file maps extension-side API wrappers to `supabase/contracts.md`.
     - `GEMINI_API_KEY` (required to run AI command)
     - `GEMINI_MODEL` (optional, defaults to `gemini-1.5-flash`)
     - `GITHUB_TOKEN` (optional, for GitHub context)
-    - `GITHUB_REPOSITORY` (optional, e.g. `n4bi10p/copilot-colab`)
+    - `GITHUB_REPOSITORY` (optional fallback if workspace git remote cannot be detected, e.g. `n4bi10p/copilot-colab`)
 
 ## Realtime wrappers (`src/extension/api/realtime.ts`)
 
