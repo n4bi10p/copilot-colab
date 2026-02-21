@@ -52,6 +52,11 @@ interface AppState {
   // UI
   activePanel: "dashboard" | "tasks" | "agent" | "terminal";
   setActivePanel: (panel: AppState["activePanel"]) => void;
+
+  // Session
+  sessionExpired: boolean;
+  setSessionExpired: (expired: boolean) => void;
+  resetState: () => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -113,4 +118,28 @@ export const useStore = create<AppState>((set) => ({
   // UI
   activePanel: "dashboard",
   setActivePanel: (panel) => set({ activePanel: panel }),
+
+  // Session
+  sessionExpired: false,
+  setSessionExpired: (expired) => set({ sessionExpired: expired }),
+  resetState: () =>
+    set({
+      currentUser: null,
+      project: null,
+      tasks: [],
+      tasksLoading: true,
+      messages: [],
+      presenceMap: {},
+      agentMessages: [],
+      activePanel: "dashboard",
+      sessionExpired: false,
+      metrics: {
+        activeAgents: 0,
+        openPRs: 0,
+        buildTime: "—",
+        coverage: "—",
+        agentDelta: "",
+        buildDelta: "",
+      },
+    }),
 }));

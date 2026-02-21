@@ -12,19 +12,20 @@ const NAV_ITEMS = [
 const NavRail: React.FC = () => {
   const { activePanel, setActivePanel } = useStore();
   const currentUser = useStore((s) => s.currentUser);
-  const setCurrentUser = useStore((s) => s.setCurrentUser);
-  const setProject = useStore((s) => s.setProject);
+  const resetState = useStore((s) => s.resetState);
   const [showMenu, setShowMenu] = useState(false);
 
   const handleSignOut = async () => {
+    setShowMenu(false);
     try {
       await backendClient.signOut();
     } catch {
       /* ignore */
     }
-    setCurrentUser(null);
-    setProject(null as any);
-    setShowMenu(false);
+    // Clear persisted project cache
+    try { localStorage.removeItem("copilot-colab.project"); } catch { /* ignore */ }
+    // Full store reset — clears user, project, tasks, messages, presence
+    resetState();
   };
 
   const initial = currentUser?.displayName?.charAt(0).toUpperCase() ?? currentUser?.email?.charAt(0).toUpperCase() ?? "?";

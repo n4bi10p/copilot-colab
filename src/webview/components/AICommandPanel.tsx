@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { backendClient } from "../utils/backendClient";
+import { useStore } from "../../state/store";
 
 export default function AICommandPanel() {
+  const project = useStore((s) => s.project);
   const [input, setInput] = useState("");
   const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,8 +18,13 @@ export default function AICommandPanel() {
     setError("");
     setLoading(true);
     try {
+      if (!project?.id) {
+        setError("No active project. Sign in and wait for workspace to load.");
+        setLoading(false);
+        return;
+      }
       const rawResponse = await backendClient.generateWbs({
-        projectId: "demo-project-id",
+        projectId: project.id,
         goal: input,
         persist: true,
       });
