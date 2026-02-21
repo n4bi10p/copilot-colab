@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { createClient } from "@supabase/supabase-js";
+import { CopilotColabAuthApi } from "./api/auth";
 import { CopilotColabRealtimeApi } from "./api/realtime";
 import { CopilotColabSupabaseApi } from "./api/supabase";
 import { registerBackendCommands, registerCommands } from "./commands";
@@ -43,9 +44,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   const client = createClient(config.url, config.anonKey);
+  const authApi = new CopilotColabAuthApi(client);
   const api = new CopilotColabSupabaseApi(client);
   const realtimeApi = new CopilotColabRealtimeApi(client);
-  registerBackendCommands(context, { api, realtimeApi, output });
+  registerBackendCommands(context, { authApi, api, realtimeApi, output });
   output.appendLine("Copilot CoLab backend commands registered.");
 }
 
@@ -64,7 +66,15 @@ class CoLabWebviewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this.getHtml(webviewView.webview);
 
-    webviewView.webview.onDidReceiveMessage((message: { command?: string; text?: string; path?: string }) => {
+    webviewView.webview.onDidReceiveMessage(
+      async (message: {
+        command?: string;
+        text?: string;
+        path?: string;
+        requestId?: string;
+        commandId?: string;
+        args?: unknown;
+      }) => {
       switch (message.command) {
         case "alert":
           if (message.text) {
@@ -75,6 +85,27 @@ class CoLabWebviewProvider implements vscode.WebviewViewProvider {
           if (message.path) {
             vscode.workspace.openTextDocument(message.path).then((doc) => {
               vscode.window.showTextDocument(doc);
+            });
+          }
+          break;
+        case "backend.execute":
+          if (!message.requestId || !message.commandId) {
+            return;
+          }
+          try {
+            const data = await vscode.commands.executeCommand(message.commandId, message.args);
+            webviewView.webview.postMessage({
+              type: "backend.response",
+              requestId: message.requestId,
+              ok: true,
+              data,
+            });
+          } catch (error) {
+            webviewView.webview.postMessage({
+              type: "backend.response",
+              requestId: message.requestId,
+              ok: false,
+              error: error instanceof Error ? error.message : String(error),
             });
           }
           break;
