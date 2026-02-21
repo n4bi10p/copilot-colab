@@ -54,7 +54,7 @@ const AgentPanel: React.FC = () => {
   };
 
   return (
-    <aside className="flex flex-col bg-[#111113] border-l border-border-dark p-6 overflow-hidden">
+    <aside className="flex h-full min-h-0 flex-col bg-[#111113] border-l border-border-dark p-6 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-sm font-mono tracking-editorial text-text-muted uppercase">
@@ -66,14 +66,15 @@ const AgentPanel: React.FC = () => {
         </div>
       </div>
 
-      <AuthWidget />
-      {/* AI Command Panel */}
-      <div className="my-6">
-        <AICommandPanel />
-      </div>
+      {/* Scrollable content stack */}
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+        <AuthWidget />
+        <div className="my-4">
+          <AICommandPanel />
+        </div>
 
-      {/* Chat + Actions */}
-      <div className="flex-1 flex flex-col gap-4 overflow-y-auto min-h-0">
+        {/* Chat + Actions */}
+        <div className="flex flex-col gap-4">
         {agentMessages.map((msg) => (
           <div key={msg.id} className="flex flex-col gap-3">
             <div className="flex gap-4">
@@ -125,7 +126,7 @@ const AgentPanel: React.FC = () => {
         <div className="w-full h-px bg-border-dark my-2" />
 
         {/* Terminal Output */}
-        <div className="flex flex-col gap-2 bg-surface-dark border border-white/5 p-4 rounded-sm font-mono text-[11px] h-48 overflow-y-auto font-light shrink-0">
+        <div className="flex flex-col gap-2 bg-surface-dark border border-white/5 p-4 rounded-sm font-mono text-[11px] max-h-52 overflow-y-auto font-light">
           <div className="flex justify-between text-text-dim border-b border-white/5 pb-2 mb-2">
             <span>TERMINAL OUTPUT</span>
             <span>bash</span>
@@ -165,6 +166,7 @@ const AgentPanel: React.FC = () => {
             );
           })}
         </div>
+      </div>
       </div>
 
       {/* Input */}

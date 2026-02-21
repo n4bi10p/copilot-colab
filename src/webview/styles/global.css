@@ -30,6 +30,13 @@ body {
 ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
 
+/* ── Native select dark theme ─────────────────────────────────────────────── */
+select,
+select option {
+  background-color: #111113;
+  color: #e4e4e7;
+}
+
 /* ── Thin stat number ─────────────────────────────────────────────────────── */
 .thin-stat {
   font-weight: 200;
