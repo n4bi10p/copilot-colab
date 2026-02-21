@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useStore } from "../../state/store";
 import { updateTaskStatus } from "../hooks/useTasks";
+import { LoadingState, EmptyState } from "./StatusState";
 import type { Task, TaskStatus } from "../../types";
 
 const STATUSES: { value: TaskStatus | "all"; label: string; color: string }[] = [
@@ -174,8 +175,12 @@ const TaskDetail: React.FC<{ task: Task }> = ({ task }) => {
       {next && (
         <button
           onClick={() => {
+            const prev = task.status;
             moveTask(task.id, next);
-            updateTaskStatus(task.id, next).catch(() => {});
+            updateTaskStatus(task.id, next).catch(() => {
+              // Rollback on failure
+              moveTask(task.id, prev);
+            });
           }}
           className="mt-auto w-full flex items-center justify-between p-4 bg-primary text-white rounded-sm hover:bg-primary/90 transition-colors group"
         >
@@ -189,27 +194,38 @@ const TaskDetail: React.FC<{ task: Task }> = ({ task }) => {
 
 const TasksView: React.FC = () => {
   const tasks = useStore((s) => s.tasks);
+  const tasksLoading = useStore((s) => s.tasksLoading);
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "all">("all");
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(tasks[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(safeTasks[0]?.id ?? null);
 
-  const filtered = tasks.filter((t) => {
+  const filtered = safeTasks.filter((t) => {
     if (filterStatus !== "all" && t.status !== filterStatus) return false;
     if (filterTag && !t.tags?.includes(filterTag)) return false;
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
-  const selectedTask = tasks.find((t) => t.id === selectedId) ?? null;
+  const selectedTask = safeTasks.find((t) => t.id === selectedId) ?? null;
 
   const countByStatus = (s: TaskStatus | "all") =>
-    s === "all" ? tasks.length : tasks.filter((t) => t.status === s).length;
+    s === "all" ? safeTasks.length : safeTasks.filter((t) => t.status === s).length;
+
+  // Full loading state
+  if (tasksLoading && safeTasks.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center bg-[#111113]">
+        <LoadingState label="Loading tasks…" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* Filter Sidebar */}
-      <aside className="w-56 shrink-0 border-r border-border-dark bg-[#0f0f11] flex flex-col p-5 overflow-y-auto">
+      <aside className="w-44 shrink-0 border-r border-border-dark bg-[#0f0f11] flex flex-col p-4 overflow-y-auto hidden md:flex">
         <h2 className="text-xs font-mono tracking-editorial text-text-dim uppercase mb-6">Filters</h2>
 
         {/* Status filters */}
@@ -250,7 +266,7 @@ const TasksView: React.FC = () => {
       </aside>
 
       {/* Task List */}
-      <div className="flex flex-col w-[400px] shrink-0 border-r border-border-dark bg-[#111113] overflow-hidden">
+      <div className="flex flex-col w-full md:w-[320px] shrink-0 border-r border-border-dark bg-[#111113] overflow-hidden">
         {/* Search header */}
         <div className="p-4 border-b border-border-dark">
           <div className="flex items-center gap-2 bg-surface-dark border border-white/5 rounded-sm px-3 py-2">

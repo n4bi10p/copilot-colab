@@ -24,8 +24,11 @@ interface AppState {
 
   // Tasks
   tasks: Task[];
+  tasksLoading: boolean;
+  setTasksLoading: (loading: boolean) => void;
   setTasks: (tasks: Task[]) => void;
   addTask: (task: Task) => void;
+  removeTask: (id: string) => void;
   updateTask: (id: string, updates: Partial<Task>) => void;
   moveTask: (id: string, status: TaskStatus) => void;
 
@@ -59,97 +62,16 @@ export const useStore = create<AppState>((set) => ({
   setAuthReady: (ready) => set({ authReady: ready }),
 
   // Project
-  project: {
-    id: "demo-project",
-    name: "Project Alpha",
-    version: "v2.4.0",
-    env: "prod-us-east",
-    created_at: new Date().toISOString(),
-    created_by: "demo",
-  },
+  project: null,
   setProject: (project) => set({ project }),
 
-  // Tasks — seeded with demo data matching the UI design
-  tasks: [
-    {
-      id: "NET-204",
-      project_id: "demo-project",
-      title: "Refactor auth middleware for new token standard",
-      status: "backlog",
-      tags: ["backend"],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "NET-221",
-      project_id: "demo-project",
-      title: "Implement Redis caching layer",
-      status: "backlog",
-      tags: ["infra", "perf"],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "NET-conflict",
-      project_id: "demo-project",
-      title: "Fix race condition in payment API webhook handler",
-      status: "in_progress",
-      priority: "high",
-      hasConflict: true,
-      progress: 66,
-      tags: ["high-priority"],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "NET-199",
-      project_id: "demo-project",
-      title: "Update dependencies for security patch",
-      status: "in_progress",
-      tags: ["maint"],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "NET-review-1",
-      project_id: "demo-project",
-      title: "API Gateway schema validation",
-      status: "in_progress",
-      prNumber: "#4092",
-      approvals: 2,
-      totalApprovals: 2,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "NET-215",
-      project_id: "demo-project",
-      title: "Dashboard V2 layout implementation",
-      status: "in_progress",
-      prNumber: "#4088",
-      commentCount: 5,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "NET-188",
-      project_id: "demo-project",
-      title: "User profile image optimization",
-      status: "done",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-    {
-      id: "NET-192",
-      project_id: "demo-project",
-      title: "Dark mode toggle persistence",
-      status: "done",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    },
-  ],
-  setTasks: (tasks) => set({ tasks: Array.isArray(tasks) ? tasks : [] }),
+  // Tasks
+  tasks: [],
+  tasksLoading: true,
+  setTasksLoading: (loading) => set({ tasksLoading: loading }),
+  setTasks: (tasks) => set({ tasks: Array.isArray(tasks) ? tasks : [], tasksLoading: false }),
   addTask: (task) => set((s) => ({ tasks: [...s.tasks, task] })),
+  removeTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
   updateTask: (id, updates) =>
     set((s) => ({
       tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...updates } : t)),
@@ -174,26 +96,17 @@ export const useStore = create<AppState>((set) => ({
 
   // Metrics
   metrics: {
-    activeAgents: 4,
-    openPRs: 12,
-    buildTime: "42s",
-    coverage: "94%",
-    agentDelta: "+1",
-    buildDelta: "-12%",
+    activeAgents: 0,
+    openPRs: 0,
+    buildTime: "—",
+    coverage: "—",
+    agentDelta: "",
+    buildDelta: "",
   },
   setMetrics: (metrics) => set({ metrics }),
 
   // Agent
-  agentMessages: [
-    {
-      id: "agent-1",
-      role: "agent",
-      content:
-        "I've detected a potential conflict in payment-api.ts based on the latest merge from origin/main.\n\nWould you like me to run a predictive analysis on the affected lines?",
-      timestamp: Date.now(),
-      actions: ["Run Analysis", "Diff Check", "Ignore"],
-    },
-  ],
+  agentMessages: [],
   addAgentMessage: (msg) =>
     set((s) => ({ agentMessages: [...s.agentMessages, msg] })),
 
