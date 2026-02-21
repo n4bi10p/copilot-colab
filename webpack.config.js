@@ -2,6 +2,7 @@
 const path = require("path");
 const webpack = require("webpack");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const TerserPlugin = require("terser-webpack-plugin");
 require("dotenv").config();
 
 /** @type {import('webpack').Configuration[]} */
@@ -19,6 +20,16 @@ module.exports = [
     },
     externals: { vscode: "commonjs vscode" },
     resolve: { extensions: [".ts", ".js"] },
+    // Strip all comments (incl. //# sourceMappingURL) from bundled dependencies
+    optimization: {
+      minimize: true,
+      minimizer: [
+        new TerserPlugin({
+          extractComments: false,
+          terserOptions: { format: { comments: false } },
+        }),
+      ],
+    },
     module: {
       rules: [
         {
