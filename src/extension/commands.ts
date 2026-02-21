@@ -24,15 +24,19 @@ export const COMMANDS = {
   authSignOut: "copilotColab.auth.signOut",
   authSignInOAuth: "copilotColab.auth.signInWithOAuth",
   aiGenerateWbs: "copilotColab.ai.generateWbs",
+  aiAssignTasks: "copilotColab.ai.assignTasks",
+  aiAssignTasksPrompt: "copilotColab.ai.assignTasksPrompt",
   aiSuggestFromSelection: "copilotColab.ai.suggestFromSelection",
   aiSmokeTest: "copilotColab.ai.smokeTest",
   backendSmokeTest: "copilotColab.backend.smokeTest",
+  demoHealthcheck: "copilotColab.demo.healthcheck",
   githubRepoSummary: "copilotColab.github.repoSummary",
   githubListOpenPrs: "copilotColab.github.listOpenPrs",
   githubCreatePr: "copilotColab.github.createPr",
   githubMergePr: "copilotColab.github.mergePr",
   githubCommentPr: "copilotColab.github.commentPr",
   createProject: "copilotColab.project.create",
+  resolveProjectForWorkspace: "copilotColab.project.resolveForWorkspace",
   inviteMember: "copilotColab.member.invite",
   removeMember: "copilotColab.member.remove",
   listMembers: "copilotColab.member.list",
@@ -40,11 +44,13 @@ export const COMMANDS = {
   createTask: "copilotColab.tasks.create",
   updateTaskStatus: "copilotColab.tasks.updateStatus",
   listMessages: "copilotColab.messages.list",
+  subscribeStateMessages: "copilotColab.messages.subscribeState",
   sendMessage: "copilotColab.messages.send",
   sendMessageAndList: "copilotColab.messages.sendAndList",
   upsertPresence: "copilotColab.presence.upsert",
   subscribeProject: "copilotColab.realtime.subscribeProject",
   unsubscribeProject: "copilotColab.realtime.unsubscribeProject",
+  realtimeHealth: "copilotColab.realtime.health",
 } as const;
 
 interface CommandDeps {
@@ -60,6 +66,11 @@ interface CommandDeps {
 interface CreateProjectArgs {
   name: string;
   createdBy: string;
+  repoFullName?: string;
+}
+
+interface ResolveProjectForWorkspaceArgs {
+  fallbackName?: string;
 }
 
 interface InviteMemberArgs {
@@ -126,6 +137,13 @@ interface GenerateWbsArgs {
   persist?: boolean;
 }
 
+interface AssignTasksArgs {
+  projectId: string;
+  taskIds?: string[];
+  persist?: boolean;
+  maxAssignments?: number;
+}
+
 interface SuggestFromSelectionArgs {
   prompt?: string;
   model?: string;
@@ -135,6 +153,10 @@ interface SuggestFromSelectionArgs {
 interface BackendSmokeTestArgs {
   projectId?: string;
   authorId?: string;
+}
+
+interface RealtimeHealthArgs {
+  projectId?: string;
 }
 
 interface GithubCreatePrArgs {
@@ -222,6 +244,29 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
     );
   };
 
+  const ensureProjectSubscribed = (projectId: string): RealtimeChannel[] => {
+    const existing = subscriptions.get(projectId);
+    if (existing && existing.length > 0) {
+      return existing;
+    }
+    const channels: RealtimeChannel[] = [
+      realtimeApi.subscribeTasksByProject(projectId, (payload) => {
+        output.appendLine(`[realtime:tasks] project=${projectId} event=${payload.eventType}`);
+      }),
+      realtimeApi.subscribeMessagesByProject(projectId, (payload) => {
+        output.appendLine(`[realtime:messages] project=${projectId} event=${payload.eventType}`);
+      }),
+      realtimeApi.subscribePresenceByProject(projectId, (payload) => {
+        output.appendLine(`[realtime:presence] project=${projectId} event=${payload.eventType}`);
+      }),
+      realtimeApi.subscribeMembersByProject(projectId, (payload) => {
+        output.appendLine(`[realtime:members] project=${projectId} event=${payload.eventType}`);
+      }),
+    ];
+    subscriptions.set(projectId, channels);
+    return channels;
+  };
+
   register(COMMANDS.authGetSession, async () => {
     const data = await authApi.getSession();
     return ok(data);
@@ -301,6 +346,127 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
       notes: suggestion.notes,
       persistedCount,
     });
+  });
+
+  register(COMMANDS.aiAssignTasks, async (args: AssignTasksArgs) => {
+    assertUuid(args.projectId, "projectId");
+    const allTasks = await api.listTasksByProject(args.projectId);
+    const targetTaskIds = new Set((args.taskIds ?? []).map((id) => id.trim()).filter(Boolean));
+    const candidateTasks = (args.taskIds?.length
+      ? allTasks.filter((task) => targetTaskIds.has(task.id))
+      : allTasks.filter((task) => task.status !== "done")
+    ).slice(0, 50);
+
+    const members = await api.listProjectMembers(args.projectId);
+    const ai = await aiApi.assignTasks({
+      projectId: args.projectId,
+      tasks: candidateTasks,
+      members,
+      maxAssignments: args.maxAssignments,
+    });
+
+    const taskById = new Map(candidateTasks.map((task) => [task.id, task]));
+    const memberIdSet = new Set(members.map((member) => member.user_id));
+    const validAssignments = ai.assignments.filter(
+      (assignment) => taskById.has(assignment.taskId) && memberIdSet.has(assignment.assigneeId)
+    );
+
+    let persisted = 0;
+    let usedFallback = false;
+    let effectiveAssignments = validAssignments;
+    if (effectiveAssignments.length === 0 && candidateTasks.length > 0 && members.length > 0) {
+      usedFallback = true;
+      const memberIds = members.map((m) => m.user_id);
+      effectiveAssignments = candidateTasks
+        .slice(0, Math.max(1, Math.min(args.maxAssignments ?? candidateTasks.length, candidateTasks.length)))
+        .map((task, idx) => ({
+          taskId: task.id,
+          assigneeId: memberIds[idx % memberIds.length],
+          reason: "Fallback round-robin assignment (AI returned no valid mapping).",
+        }));
+    }
+    if (args.persist && validAssignments.length > 0) {
+      await Promise.all(
+        effectiveAssignments.map((assignment) => api.updateTaskAssignee(assignment.taskId, assignment.assigneeId))
+      );
+      persisted = effectiveAssignments.length;
+    }
+
+    output.appendLine(
+      `[${COMMANDS.aiAssignTasks}] project=${args.projectId} proposed=${ai.assignments.length} valid=${validAssignments.length} fallback=${usedFallback} persisted=${persisted}`
+    );
+
+    return ok({
+      projectId: args.projectId,
+      model: ai.model,
+      assignments: effectiveAssignments,
+      notes: usedFallback ? [...ai.notes, "Used fallback round-robin assignment."] : ai.notes,
+      usedFallback,
+      persistedCount: persisted,
+    });
+  });
+
+  register(COMMANDS.aiAssignTasksPrompt, async () => {
+    const projectId = await vscode.window.showInputBox({
+      title: "Copilot CoLab AI Assign Tasks",
+      prompt: "Project UUID",
+      placeHolder: "10ebe2d6-60d3-42f0-adf5-25ed751a44eb",
+      ignoreFocusOut: true,
+    });
+    if (!projectId?.trim()) {
+      return ok({ cancelled: true, step: "projectId" });
+    }
+
+    const persistChoice = await vscode.window.showQuickPick(
+      [
+        { label: "Yes (persist assignees)", value: true },
+        { label: "No (preview only)", value: false },
+      ],
+      {
+        title: "Persist assignee updates to tasks?",
+        ignoreFocusOut: true,
+      }
+    );
+    if (!persistChoice) {
+      return ok({ cancelled: true, step: "persist" });
+    }
+
+    const maxAssignmentsRaw = await vscode.window.showInputBox({
+      title: "Copilot CoLab AI Assign Tasks",
+      prompt: "Max assignments (1-50)",
+      value: "10",
+      ignoreFocusOut: true,
+    });
+    const parsed = Number.parseInt(maxAssignmentsRaw ?? "10", 10);
+    const maxAssignments = Number.isFinite(parsed) ? parsed : 10;
+
+    const result = await vscode.commands.executeCommand<CommandResult>(COMMANDS.aiAssignTasks, {
+      projectId: projectId.trim(),
+      persist: persistChoice.value,
+      maxAssignments,
+    } satisfies AssignTasksArgs);
+
+    if (!result) {
+      throw new Error("No result returned from AI assign command.");
+    }
+    if (!result.ok && "error" in result) {
+      throw new Error(result.error);
+    }
+
+    const data = (result as CommandSuccess).data as {
+      persistedCount?: number;
+      assignments?: unknown[];
+      notes?: string[];
+    };
+
+    output.show(true);
+    output.appendLine(
+      `[${COMMANDS.aiAssignTasksPrompt}] assignments=${Array.isArray(data.assignments) ? data.assignments.length : 0} persisted=${data.persistedCount ?? 0}`
+    );
+    vscode.window.showInformationMessage(
+      `AI assign complete: ${Array.isArray(data.assignments) ? data.assignments.length : 0} proposed, ${data.persistedCount ?? 0} persisted.`
+    );
+    return ok(data);
   });
 
   register(COMMANDS.aiSuggestFromSelection, async (args: SuggestFromSelectionArgs = {}) => {
@@ -445,6 +611,61 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
     return ok(result);
   });
 
+  register(COMMANDS.demoHealthcheck, async (args: BackendSmokeTestArgs = {}) => {
+    const out: Record<string, unknown> = {
+      auth: false,
+      project: false,
+      github: false,
+      messages: false,
+      realtime: false,
+    };
+
+    const user = await authApi.getCurrentUser();
+    if (!user?.id) {
+      throw makeCommandError("AUTH_REQUIRED", "Authentication required.");
+    }
+    out.auth = true;
+    out.userId = user.id;
+
+    const resolved = await vscode.commands.executeCommand<CommandResult>(COMMANDS.resolveProjectForWorkspace, {
+      fallbackName: "Copilot CoLab",
+    } satisfies ResolveProjectForWorkspaceArgs);
+    if (!resolved?.ok || !("data" in resolved)) {
+      throw makeCommandError("PROJECT_RESOLVE_FAILED", "Could not resolve workspace project.");
+    }
+    const project = resolved.data as { id?: string; name?: string };
+    const projectId = args.projectId ?? project.id;
+    if (!projectId) {
+      throw makeCommandError("PROJECT_REQUIRED", "No project id available.");
+    }
+    out.project = true;
+    out.projectId = projectId;
+
+    try {
+      await githubApi.getRepositorySummary();
+      out.github = true;
+    } catch (error) {
+      out.github = false;
+      out.githubError = error instanceof Error ? error.message : String(error);
+    }
+
+    await vscode.commands.executeCommand(COMMANDS.sendMessage, {
+      projectId,
+      authorId: args.authorId ?? user.id,
+      text: "[demo] backend healthcheck ping",
+    } satisfies SendMessageArgs);
+    const rows = await api.listMessagesByProject(projectId, 5);
+    out.messages = rows.length > 0;
+    out.recentMessages = rows.length;
+
+    const channels = ensureProjectSubscribed(projectId);
+    out.realtime = channels.length > 0;
+    out.realtimeChannels = channels.length;
+
+    output.appendLine(`[${COMMANDS.demoHealthcheck}] ${JSON.stringify(out)}`);
+    return ok(out);
+  });
+
   register(COMMANDS.githubRepoSummary, async () => {
     const data = await githubApi.getRepositorySummary();
     output.appendLine(`[${COMMANDS.githubRepoSummary}] repo=${data.repository}`);
@@ -478,9 +699,42 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
   });
 
   register(COMMANDS.createProject, async (args: CreateProjectArgs) => {
-    const data = await api.createProject({ name: args.name, createdBy: args.createdBy });
+    const data = await api.createProject({
+      name: args.name,
+      createdBy: args.createdBy,
+      repoFullName: args.repoFullName ?? null,
+    });
     output.appendLine(`[${COMMANDS.createProject}] project=${data.id}`);
     return ok(data);
+  });
+
+  register(COMMANDS.resolveProjectForWorkspace, async (args: ResolveProjectForWorkspaceArgs = {}) => {
+    const user = await authApi.getCurrentUser();
+    if (!user?.id) {
+      throw makeCommandError("AUTH_REQUIRED", "Authentication required.");
+    }
+
+    const repoFullName = githubApi.getRepository();
+    if (repoFullName) {
+      const existing = await api.findProjectByRepo(repoFullName);
+      if (existing) {
+        output.appendLine(`[${COMMANDS.resolveProjectForWorkspace}] resolved existing project=${existing.id} repo=${repoFullName}`);
+        return ok(existing);
+      }
+    }
+
+    const baseName = (repoFullName ?? args.fallbackName ?? user.email ?? "workspace")
+      .split("/")
+      .pop()
+      ?.replace(/\.git$/i, "")
+      ?.trim();
+    const created = await api.createProject({
+      name: baseName ? `${baseName} Workspace` : "Workspace",
+      createdBy: user.id,
+      repoFullName: repoFullName ?? null,
+    });
+    output.appendLine(`[${COMMANDS.resolveProjectForWorkspace}] created project=${created.id} repo=${repoFullName ?? "none"}`);
+    return ok(created);
   });
 
   register(COMMANDS.inviteMember, async (args: InviteMemberArgs) => {
@@ -532,6 +786,18 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
   register(COMMANDS.listMessages, async (args: ListByProjectArgs) => {
     const data = await api.listMessagesByProject(args.projectId);
     return ok(data);
+  });
+
+  register(COMMANDS.subscribeStateMessages, async (args: ListByProjectArgs) => {
+    assertUuid(args.projectId, "projectId");
+    const messages = await api.listMessagesByProject(args.projectId, 100);
+    const channels = ensureProjectSubscribed(args.projectId);
+    return ok({
+      projectId: args.projectId,
+      messages,
+      subscribed: channels.length > 0,
+      channelCount: channels.length,
+    });
   });
 
   register(COMMANDS.sendMessage, async (args: SendMessageArgs) => {
@@ -617,21 +883,7 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
 
   register(COMMANDS.subscribeProject, async (args: SubscribeProjectArgs) => {
     const projectId = args.projectId;
-    const channels: RealtimeChannel[] = [
-      realtimeApi.subscribeTasksByProject(projectId, (payload) => {
-        output.appendLine(`[realtime:tasks] project=${projectId} event=${payload.eventType}`);
-      }),
-      realtimeApi.subscribeMessagesByProject(projectId, (payload) => {
-        output.appendLine(`[realtime:messages] project=${projectId} event=${payload.eventType}`);
-      }),
-      realtimeApi.subscribePresenceByProject(projectId, (payload) => {
-        output.appendLine(`[realtime:presence] project=${projectId} event=${payload.eventType}`);
-      }),
-      realtimeApi.subscribeMembersByProject(projectId, (payload) => {
-        output.appendLine(`[realtime:members] project=${projectId} event=${payload.eventType}`);
-      }),
-    ];
-    subscriptions.set(projectId, channels);
+    const channels = ensureProjectSubscribed(projectId);
     return ok({ projectId, channels: channels.length });
   });
 
@@ -640,5 +892,25 @@ export function registerBackendCommands(context: vscode.ExtensionContext, deps: 
     await Promise.all(channels.map((channel) => realtimeApi.unsubscribe(channel)));
     subscriptions.delete(args.projectId);
     return ok({ projectId: args.projectId, unsubscribed: channels.length });
+  });
+
+  register(COMMANDS.realtimeHealth, async (args: RealtimeHealthArgs = {}) => {
+    const projectId = args.projectId?.trim();
+    if (projectId) {
+      const channels = subscriptions.get(projectId) ?? [];
+      return ok({
+        projectId,
+        subscribed: channels.length > 0,
+        channels: channels.length,
+      });
+    }
+    const summary = Array.from(subscriptions.entries()).map(([id, channels]) => ({
+      projectId: id,
+      channels: channels.length,
+    }));
+    return ok({
+      projectCount: summary.length,
+      subscriptions: summary,
+    });
   });
 }

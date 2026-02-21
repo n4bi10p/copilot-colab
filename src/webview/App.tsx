@@ -69,18 +69,44 @@ const ProjectBootstrap: React.FC = () => {
       }
 
       try {
-        const project = await backendClient.execute<Project>(BACKEND_COMMANDS.createProject, {
-          name: `${(currentUser.displayName || currentUser.email || "Team").split("@")[0]} Workspace`,
-          createdBy: currentUser.uid,
-        });
+        const project = await backendClient.execute<Project>(
+          BACKEND_COMMANDS.resolveProjectForWorkspace,
+          {
+            fallbackName: `${(currentUser.displayName || currentUser.email || "Team").split("@")[0]} Workspace`,
+          }
+        );
+
+        if (!project?.id) {
+          throw new Error("Workspace project resolver did not return a valid project.");
+        }
 
         if (!cancelled) {
           setProject(project);
           cacheProject(project);
         }
       } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to initialize workspace.");
+        // Fallback to explicit project creation for compatibility with older command surfaces.
+        try {
+          const project = await backendClient.execute<Project>(BACKEND_COMMANDS.createProject, {
+            name: `${(currentUser.displayName || currentUser.email || "Team").split("@")[0]} Workspace`,
+            createdBy: currentUser.uid,
+            repoFullName: undefined,
+          });
+
+          if (!cancelled) {
+            setProject(project);
+            cacheProject(project);
+          }
+        } catch (fallbackErr) {
+          if (!cancelled) {
+            setError(
+              fallbackErr instanceof Error
+                ? fallbackErr.message
+                : err instanceof Error
+                ? err.message
+                : "Failed to initialize workspace."
+            );
+          }
         }
       } finally {
         if (!cancelled) setLoading(false);

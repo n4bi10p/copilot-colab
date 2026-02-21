@@ -26,14 +26,17 @@ export const BACKEND_COMMANDS = {
   authSignOut: "copilotColab.auth.signOut",
   authSignInOAuth: "copilotColab.auth.signInWithOAuth",
   aiGenerateWbs: "copilotColab.ai.generateWbs",
+  aiAssignTasks: "copilotColab.ai.assignTasks",
   aiSuggestFromSelection: "copilotColab.ai.suggestFromSelection",
   backendSmokeTest: "copilotColab.backend.smokeTest",
+  demoHealthcheck: "copilotColab.demo.healthcheck",
   githubRepoSummary: "copilotColab.github.repoSummary",
   githubListOpenPrs: "copilotColab.github.listOpenPrs",
   githubCreatePr: "copilotColab.github.createPr",
   githubMergePr: "copilotColab.github.mergePr",
   githubCommentPr: "copilotColab.github.commentPr",
   createProject: "copilotColab.project.create",
+  resolveProjectForWorkspace: "copilotColab.project.resolveForWorkspace",
   inviteMember: "copilotColab.member.invite",
   removeMember: "copilotColab.member.remove",
   listMembers: "copilotColab.member.list",
@@ -41,11 +44,13 @@ export const BACKEND_COMMANDS = {
   createTask: "copilotColab.tasks.create",
   updateTaskStatus: "copilotColab.tasks.updateStatus",
   listMessages: "copilotColab.messages.list",
+  subscribeStateMessages: "copilotColab.messages.subscribeState",
   sendMessage: "copilotColab.messages.send",
   sendMessageAndList: "copilotColab.messages.sendAndList",
   upsertPresence: "copilotColab.presence.upsert",
   subscribeProject: "copilotColab.realtime.subscribeProject",
   unsubscribeProject: "copilotColab.realtime.unsubscribeProject",
+  realtimeHealth: "copilotColab.realtime.health",
 } as const;
 
 export class BackendClient {
@@ -153,6 +158,15 @@ export class BackendClient {
     persist?: boolean;
   }): Promise<T> {
     return this.execute<T>(BACKEND_COMMANDS.aiGenerateWbs, args, 20_000);
+  }
+
+  assignTasks<T = unknown>(args: {
+    projectId: string;
+    taskIds?: string[];
+    persist?: boolean;
+    maxAssignments?: number;
+  }): Promise<T> {
+    return this.execute<T>(BACKEND_COMMANDS.aiAssignTasks, args, 20_000);
   }
 
   suggestFromSelection<T = unknown>(args?: {

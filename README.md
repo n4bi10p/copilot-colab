@@ -113,7 +113,7 @@ Tasks, chat, and presence update instantly for all users. No refresh needed.
 ### Prerequisites
 - Node.js >= 18.x
 - VS Code >= 1.90.0
-- Supabase project (with URL and service key)
+- Supabase project (with URL and anon key)
 
 ```bash
 # Install Node.js
@@ -181,21 +181,61 @@ Let Gemini generate a work breakdown structure for your project.
 | Option           | Type    | Default | Description                                 |
 | :--------------: | :-----: | :-----: | :------------------------------------------: |
 | SUPABASE_URL     | string  | N/A     | Your Supabase project URL                    |
-| SUPABASE_KEY     | string  | N/A     | Service role key for Supabase                |
+| SUPABASE_ANON_KEY| string  | N/A     | Supabase anon key used by extension auth     |
 | GEMINI_API_KEY   | string  | N/A     | API key for Gemini AI                        |
-| RLS_ENABLED      | boolean | true    | Enable row-level security                    |
-| DASHBOARD_THEME  | string  | dark    | Dashboard color theme                        |
+| GEMINI_MODEL     | string  | gemini-1.5-flash | Gemini model for task/chat AI     |
+| GITHUB_TOKEN     | string  | N/A     | GitHub API token for repo/PR operations      |
+| GITHUB_REPOSITORY| string  | auto-detect | Fallback repo (`owner/repo`) if git detect fails |
+| COPILOT_MODEL    | string  | gpt-4.1 | Copilot SDK model for selection suggestions  |
+| COPILOT_CLI_URL  | string  | http://localhost:4321 | Copilot CLI server URL             |
 
 ```yaml
 # .env example
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-service-role-key
+SUPABASE_ANON_KEY=your-anon-key
 GEMINI_API_KEY=your-gemini-key
-RLS_ENABLED=true
-DASHBOARD_THEME=dark
+GEMINI_MODEL=gemini-1.5-flash
+GITHUB_TOKEN=ghp_xxx
+GITHUB_REPOSITORY=owner/repo
+COPILOT_MODEL=gpt-4.1
+COPILOT_CLI_URL=http://localhost:4321
 ```
 
 > [!WARNING] Never commit your Supabase or Gemini keys to public repos.
+
+## 🧩 Backend Command Quick Reference
+
+Core backend commands exposed by the extension host:
+
+- `copilotColab.project.resolveForWorkspace`: resolve/create project using workspace repo mapping.
+- `copilotColab.ai.generateWbs`: generate task breakdown, optional persist.
+- `copilotColab.ai.assignTasks`: assign tasks to members with Gemini, optional persist.
+- `copilotColab.ai.assignTasksPrompt`: prompt-driven assignment test from Command Palette.
+- `copilotColab.messages.send`: send chat message, triggers `@gemini` auto-reply.
+- `copilotColab.messages.sendAndList`: send + return latest messages (UI-friendly roundtrip).
+- `copilotColab.messages.subscribeState`: get current messages + ensure realtime subscription.
+- `copilotColab.realtime.subscribeProject` / `copilotColab.realtime.unsubscribeProject`: realtime lifecycle.
+- `copilotColab.realtime.health`: inspect current subscription status.
+- `copilotColab.backend.smokeTest`: quick backend checks.
+- `copilotColab.demo.healthcheck`: demo readiness check (auth, project, github, messages, realtime).
+
+## ✅ Demo E2E Checklist
+
+Run this sequence for a full demo validation:
+
+1. Start local backend and apply migrations:
+   - `npx supabase db push`
+2. Build and run extension:
+   - `npm run compile:extension`
+   - `F5` (Extension Development Host)
+3. Sign in from UI.
+4. In `Team Setup`:
+   - invite at least one member UUID
+   - create starter tasks
+   - run `Assign Tasks (Gemini)`
+5. Send a chat message with `@gemini`.
+6. Run `Copilot CoLab: Demo Healthcheck` from Command Palette.
+7. Verify Output panel (`Copilot CoLab Backend`) has successful logs for assign/chat/realtime.
 
 ## 🗺️ Roadmap
 Here's what's done and what's coming next.
@@ -268,4 +308,3 @@ Distributed under the MIT License. See LICENSE.txt for more information.
    <br/>
    Made with ❤️ by [Aman, Nabil, Bhumi] 
    <br/>
-

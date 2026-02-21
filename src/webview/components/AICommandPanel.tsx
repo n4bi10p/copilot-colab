@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { backendClient } from "../utils/backendClient";
+import { backendClient, BACKEND_COMMANDS } from "../utils/backendClient";
+import { useStore } from "../../state/store";
 
 type CopilotResponse = {
   content: string;
@@ -19,11 +20,17 @@ type GithubRepoSummary = {
 const MODEL_OPTIONS = ["gpt-4.1", "gpt-4o", "gpt-5"];
 
 const AICommandPanel: React.FC = () => {
+  const project = useStore((s) => s.project);
   const [prompt, setPrompt] = useState("Explain this code and suggest concrete improvements.");
   const [model, setModel] = useState("gpt-4.1");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CopilotResponse | null>(null);
+  const [memberUserId, setMemberUserId] = useState("");
+  const [memberRole, setMemberRole] = useState<"owner" | "member">("member");
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
+  const [teamResult, setTeamResult] = useState<string | null>(null);
   const [repoLoading, setRepoLoading] = useState(false);
   const [repoError, setRepoError] = useState<string | null>(null);
   const [repoSummary, setRepoSummary] = useState<GithubRepoSummary | null>(null);
@@ -69,6 +76,90 @@ const AICommandPanel: React.FC = () => {
       setRepoError(err instanceof Error ? err.message : "Failed to load repository summary.");
     } finally {
       setRepoLoading(false);
+    }
+  };
+
+  const inviteMember = async () => {
+    if (!project?.id) {
+      setTeamError("No active project found.");
+      return;
+    }
+    if (!memberUserId.trim()) {
+      setTeamError("Member user UUID is required.");
+      return;
+    }
+    setTeamLoading(true);
+    setTeamError(null);
+    setTeamResult(null);
+    try {
+      await backendClient.execute(BACKEND_COMMANDS.inviteMember, {
+        projectId: project.id,
+        userId: memberUserId.trim(),
+        role: memberRole,
+      });
+      setTeamResult(`Member invited: ${memberUserId.trim()} (${memberRole})`);
+      setMemberUserId("");
+    } catch (err) {
+      setTeamError(err instanceof Error ? err.message : "Failed to invite member.");
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  const createStarterTasks = async () => {
+    if (!project?.id) {
+      setTeamError("No active project found.");
+      return;
+    }
+    const starters = [
+      "Integrate chat message list + send flow",
+      "Hook realtime subscription for messages",
+      "Render assistant messages with sender badges",
+    ];
+    setTeamLoading(true);
+    setTeamError(null);
+    setTeamResult(null);
+    try {
+      await Promise.all(
+        starters.map((title) =>
+          backendClient.execute(BACKEND_COMMANDS.createTask, {
+            projectId: project.id,
+            title,
+            status: "backlog",
+          })
+        )
+      );
+      setTeamResult(`Created ${starters.length} starter tasks.`);
+    } catch (err) {
+      setTeamError(err instanceof Error ? err.message : "Failed to create starter tasks.");
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  const assignTasksWithGemini = async () => {
+    if (!project?.id) {
+      setTeamError("No active project found.");
+      return;
+    }
+    setTeamLoading(true);
+    setTeamError(null);
+    setTeamResult(null);
+    try {
+      const data = await backendClient.assignTasks<{
+        assignments?: Array<{ taskId: string; assigneeId: string }>;
+        persistedCount?: number;
+      }>({
+        projectId: project.id,
+        persist: true,
+        maxAssignments: 10,
+      });
+      const proposed = Array.isArray(data.assignments) ? data.assignments.length : 0;
+      setTeamResult(`Gemini assignment complete: proposed=${proposed}, persisted=${data.persistedCount ?? 0}`);
+    } catch (err) {
+      setTeamError(err instanceof Error ? err.message : "Failed to assign tasks with Gemini.");
+    } finally {
+      setTeamLoading(false);
     }
   };
 
@@ -219,6 +310,56 @@ const AICommandPanel: React.FC = () => {
           </div>
         </div>
       )}
+
+      <div className="mt-4 pt-3 border-t border-white/5">
+        <h3 className="text-[10px] font-mono tracking-editorial text-text-muted uppercase mb-2">Team Setup</h3>
+        <p className="text-[11px] text-text-dim mb-2">
+          Project: <span className="font-mono text-text-main">{project?.id ?? "not ready"}</span>
+        </p>
+        <div className="grid grid-cols-1 gap-2 mb-2">
+          <input
+            value={memberUserId}
+            onChange={(e) => setMemberUserId(e.target.value)}
+            placeholder="Member user UUID"
+            className="w-full h-8 bg-white/5 border border-white/10 rounded-sm px-2.5 text-[11px] font-mono text-text-main outline-none focus:border-primary/50"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={memberRole}
+              onChange={(e) => setMemberRole(e.target.value as "owner" | "member")}
+              className="h-8 appearance-none bg-[#111113] border border-white/10 rounded-sm px-2.5 text-[11px] font-mono text-white outline-none focus:border-primary/50"
+            >
+              <option value="member">member</option>
+              <option value="owner">owner</option>
+            </select>
+            <button
+              onClick={inviteMember}
+              disabled={teamLoading}
+              className="h-8 border border-white/15 text-text-muted text-[11px] font-mono rounded-sm hover:text-white transition-colors disabled:opacity-50"
+            >
+              Invite Member
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={createStarterTasks}
+              disabled={teamLoading}
+              className="h-8 border border-white/15 text-text-muted text-[11px] font-mono rounded-sm hover:text-white transition-colors disabled:opacity-50"
+            >
+              Create Starter Tasks
+            </button>
+            <button
+              onClick={assignTasksWithGemini}
+              disabled={teamLoading}
+              className="h-8 border border-primary/30 text-primary text-[11px] font-mono rounded-sm hover:bg-primary/10 transition-colors disabled:opacity-50"
+            >
+              Assign Tasks (Gemini)
+            </button>
+          </div>
+        </div>
+        {teamError && <p className="mt-2 text-[11px] font-mono text-red-400">{teamError}</p>}
+        {teamResult && <p className="mt-2 text-[11px] font-mono text-emerald-400">{teamResult}</p>}
+      </div>
 
       <div className="mt-4 pt-3 border-t border-white/5">
         <div className="flex items-center justify-between gap-2 mb-2">

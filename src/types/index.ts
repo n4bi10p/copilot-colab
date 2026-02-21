@@ -58,6 +58,7 @@ export interface Project {
   env?: string;
   created_at: string;
   created_by: string;
+  repo_full_name?: string | null;
 }
 
 // ── Dashboard metrics ────────────────────────────────────────────────────────

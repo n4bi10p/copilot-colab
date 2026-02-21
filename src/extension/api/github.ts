@@ -46,6 +46,10 @@ export class CopilotColabGithubApi {
     this.repository = repository;
   }
 
+  getRepository(): string | null {
+    return this.repository?.trim() || null;
+  }
+
   private ensureConfigured(): { repository: string; headers: Record<string, string> } {
     if (!this.token || !this.repository) {
       throw new Error("GitHub is not configured. Set GITHUB_TOKEN and repository context.");

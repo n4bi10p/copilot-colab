@@ -1,4 +1,4 @@
-import type { Message, Task } from "../../types/backend";
+import type { Message, ProjectMember, Task } from "../../types/backend";
 
 export interface WbsTaskSuggestion {
   title: string;
@@ -33,6 +33,23 @@ export interface GenerateMentionReplyInput {
   message: string;
   existingTasks?: Task[];
   recentMessages?: Message[];
+}
+
+export interface AssignTasksInput {
+  projectId: string;
+  tasks: Task[];
+  members: ProjectMember[];
+  maxAssignments?: number;
+}
+
+export interface AssignTasksOutput {
+  assignments: Array<{
+    taskId: string;
+    assigneeId: string;
+    reason?: string;
+  }>;
+  notes: string[];
+  model: string;
 }
 
 interface AiConfig {
@@ -75,6 +92,20 @@ function toTaskSuggestion(raw: unknown): WbsTaskSuggestion | null {
   const suggestedAssignee = row.suggestedAssignee ? String(row.suggestedAssignee) : undefined;
 
   return { title, status, reason, suggestedAssignee };
+}
+
+function toTaskAssignment(raw: unknown): { taskId: string; assigneeId: string; reason?: string } | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const row = raw as Record<string, unknown>;
+  const taskId = String(row.taskId ?? "").trim();
+  const assigneeId = String(row.assigneeId ?? "").trim();
+  if (!taskId || !assigneeId) {
+    return null;
+  }
+  const reason = row.reason ? String(row.reason) : undefined;
+  return { taskId, assigneeId, reason };
 }
 
 export class CopilotColabAiApi {
@@ -154,6 +185,63 @@ export class CopilotColabAiApi {
       throw new Error("Gemini returned an empty mention reply.");
     }
     return { text, model: this.model };
+  }
+
+  async assignTasks(input: AssignTasksInput): Promise<AssignTasksOutput> {
+    if (!this.apiKey) {
+      throw new Error("GEMINI_API_KEY is missing. Set it in your extension launch environment.");
+    }
+    const maxAssignments = Math.max(1, Math.min(input.maxAssignments ?? input.tasks.length, input.tasks.length));
+    const taskRows = input.tasks.map((task) => ({
+      id: task.id,
+      title: task.title,
+      status: task.status,
+      assignee_id: task.assignee_id ?? null,
+    }));
+    const memberRows = input.members.map((member) => ({
+      user_id: member.user_id,
+      role: member.role,
+    }));
+    if (taskRows.length === 0) {
+      return { assignments: [], notes: ["No tasks available for assignment."], model: this.model };
+    }
+    if (memberRows.length === 0) {
+      return { assignments: [], notes: ["No project members available for assignment."], model: this.model };
+    }
+
+    const prompt = [
+      "You are assigning engineering tasks to team members.",
+      "Balance assignments by role and avoid reassigning tasks that already have assignee_id unless necessary.",
+      "Output ONLY valid JSON.",
+      "",
+      `projectId: ${input.projectId}`,
+      `maxAssignments: ${maxAssignments}`,
+      "",
+      "members:",
+      JSON.stringify(memberRows),
+      "",
+      "tasks:",
+      JSON.stringify(taskRows),
+      "",
+      'JSON shape: {"assignments":[{"taskId":"uuid","assigneeId":"uuid","reason":"string"}],"notes":["string"]}',
+      "Rules:",
+      "- Use only task ids and member user_ids provided above.",
+      "- Keep reasons concise.",
+      "- No markdown and no extra keys.",
+    ].join("\n");
+
+    const text = await this.generateText(prompt);
+    if (!text) {
+      throw new Error("Gemini returned an empty assignment response.");
+    }
+    const jsonText = extractJsonObject(text);
+    const parsed = JSON.parse(jsonText) as { assignments?: unknown[]; notes?: unknown[] };
+    const assignments = (parsed.assignments ?? [])
+      .map(toTaskAssignment)
+      .filter((item): item is { taskId: string; assigneeId: string; reason?: string } => Boolean(item))
+      .slice(0, maxAssignments);
+    const notes = Array.isArray(parsed.notes) ? parsed.notes.map((item) => String(item)) : [];
+    return { assignments, notes, model: this.model };
   }
 
   private async generateText(prompt: string): Promise<string> {

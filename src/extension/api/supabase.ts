@@ -20,18 +20,31 @@ function ensureNoError(error: { message: string } | null): void {
 export class CopilotColabSupabaseApi {
   constructor(private readonly client: ApiClient) {}
 
-  async createProject(input: { name: string; createdBy: string }): Promise<Project> {
+  async createProject(input: { name: string; createdBy: string; repoFullName?: string | null }): Promise<Project> {
     const { data, error } = await this.client
       .from("projects")
       .insert({
         name: input.name,
         created_by: input.createdBy,
+        repo_full_name: input.repoFullName ?? null,
       })
       .select("*")
       .single();
 
     ensureNoError(error);
     return data as Project;
+  }
+
+  async findProjectByRepo(repoFullName: string): Promise<Project | null> {
+    const { data, error } = await this.client
+      .from("projects")
+      .select("*")
+      .eq("repo_full_name", repoFullName)
+      .limit(1)
+      .maybeSingle();
+
+    ensureNoError(error);
+    return (data as Project | null) ?? null;
   }
 
   async addProjectMember(input: {
@@ -155,6 +168,21 @@ export class CopilotColabSupabaseApi {
     const { data, error } = await this.client
       .from("tasks")
       .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    ensureNoError(error);
+    return data as Task;
+  }
+
+  async updateTaskAssignee(id: string, assigneeId: string | null): Promise<Task> {
+    const { data, error } = await this.client
+      .from("tasks")
+      .update({
+        assignee_id: assigneeId,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", id)
       .select("*")
       .single();

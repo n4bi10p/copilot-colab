@@ -7,6 +7,7 @@ export interface Project {
   name: string;
   created_at: string;
   created_by: string;
+  repo_full_name?: string | null;
 }
 
 export interface ProjectMember {
@@ -56,8 +57,9 @@ export interface Database {
     Tables: {
       projects: {
         Row: Project;
-        Insert: Pick<Project, "name" | "created_by"> & Partial<Pick<Project, "id" | "created_at">>;
-        Update: Partial<Pick<Project, "name" | "created_by">>;
+        Insert: Pick<Project, "name" | "created_by"> &
+          Partial<Pick<Project, "id" | "created_at" | "repo_full_name">>;
+        Update: Partial<Pick<Project, "name" | "created_by" | "repo_full_name">>;
       };
       project_members: {
         Row: ProjectMember;

@@ -18,15 +18,19 @@
     "onCommand:copilotColab.auth.signUpWithPassword",
     "onCommand:copilotColab.auth.signOut",
     "onCommand:copilotColab.ai.generateWbs",
+    "onCommand:copilotColab.ai.assignTasks",
+    "onCommand:copilotColab.ai.assignTasksPrompt",
     "onCommand:copilotColab.ai.suggestFromSelection",
     "onCommand:copilotColab.ai.smokeTest",
     "onCommand:copilotColab.backend.smokeTest",
+    "onCommand:copilotColab.demo.healthcheck",
     "onCommand:copilotColab.github.repoSummary",
     "onCommand:copilotColab.github.listOpenPrs",
     "onCommand:copilotColab.github.createPr",
     "onCommand:copilotColab.github.mergePr",
     "onCommand:copilotColab.github.commentPr",
     "onCommand:copilotColab.project.create",
+    "onCommand:copilotColab.project.resolveForWorkspace",
     "onCommand:copilotColab.member.invite",
     "onCommand:copilotColab.member.remove",
     "onCommand:copilotColab.member.list",
@@ -34,11 +38,13 @@
     "onCommand:copilotColab.tasks.create",
     "onCommand:copilotColab.tasks.updateStatus",
     "onCommand:copilotColab.messages.list",
+    "onCommand:copilotColab.messages.subscribeState",
     "onCommand:copilotColab.messages.send",
     "onCommand:copilotColab.messages.sendAndList",
     "onCommand:copilotColab.presence.upsert",
     "onCommand:copilotColab.realtime.subscribeProject",
-    "onCommand:copilotColab.realtime.unsubscribeProject"
+    "onCommand:copilotColab.realtime.unsubscribeProject",
+    "onCommand:copilotColab.realtime.health"
   ],
   "contributes": {
     "commands": [
@@ -71,6 +77,14 @@
         "title": "Copilot CoLab: AI Generate WBS"
       },
       {
+        "command": "copilotColab.ai.assignTasks",
+        "title": "Copilot CoLab: AI Assign Tasks"
+      },
+      {
+        "command": "copilotColab.ai.assignTasksPrompt",
+        "title": "Copilot CoLab: AI Assign Tasks (Prompt)"
+      },
+      {
         "command": "copilotColab.ai.suggestFromSelection",
         "title": "Copilot CoLab: AI Suggest From Selection"
       },
@@ -81,6 +95,10 @@
       {
         "command": "copilotColab.backend.smokeTest",
         "title": "Copilot CoLab: Backend Smoke Test"
+      },
+      {
+        "command": "copilotColab.demo.healthcheck",
+        "title": "Copilot CoLab: Demo Healthcheck"
       },
       {
         "command": "copilotColab.github.repoSummary",
@@ -105,6 +123,10 @@
       {
         "command": "copilotColab.project.create",
         "title": "Copilot CoLab: Create Project"
+      },
+      {
+        "command": "copilotColab.project.resolveForWorkspace",
+        "title": "Copilot CoLab: Resolve Project For Workspace"
       },
       {
         "command": "copilotColab.member.invite",
@@ -135,6 +157,10 @@
         "title": "Copilot CoLab: List Messages"
       },
       {
+        "command": "copilotColab.messages.subscribeState",
+        "title": "Copilot CoLab: Message Subscribe State"
+      },
+      {
         "command": "copilotColab.messages.send",
         "title": "Copilot CoLab: Send Message"
       },
@@ -153,6 +179,10 @@
       {
         "command": "copilotColab.realtime.unsubscribeProject",
         "title": "Copilot CoLab: Unsubscribe Realtime"
+      },
+      {
+        "command": "copilotColab.realtime.health",
+        "title": "Copilot CoLab: Realtime Health"
       }
     ],
     "viewsContainers": {
