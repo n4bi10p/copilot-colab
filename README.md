@@ -25,11 +25,13 @@
    <br/><br/>
 </div>
 
-<!-- Replace with your demo GIF or screenshot — aim for 800px wide, 60fps GIF or MP4 poster -->
+<!-- Demo Video -->
 <div align="center">
-   <img src="https://placehold.co/800x450?text=Demo+Preview" alt="Demo Preview" width="800" />
+   <a href="https://youtu.be/O-yuJCzHZVY" target="_blank">
+      <img src="https://img.youtube.com/vi/O-yuJCzHZVY/maxresdefault.jpg" alt="Copilot CoLab Demo Video" width="800" style="border-radius:8px;" />
+   </a>
    <br/>
-  
+   <a href="https://youtu.be/O-yuJCzHZVY" target="_blank">▶️ Watch Demo on YouTube</a>
 </div>
 
 <details><summary>📋 Table of Contents</summary>
